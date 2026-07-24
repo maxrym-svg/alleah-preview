@@ -3,6 +3,9 @@
 -- just opening the home view counts). Deliberately dumb/append-style like the other
 -- activity logs (queries, screen_log) - the streak math itself stays client-side,
 -- same convention as fmtAge()/the task meters in index.html.
+--
+-- Note: the chip's flame colour/label scale by streak length (see STREAK_TIERS in
+-- index.html) - that's presentational only and needs no schema support here.
 
 create table activity_days (
   user_id     uuid not null references auth.users(id) default auth.uid(),

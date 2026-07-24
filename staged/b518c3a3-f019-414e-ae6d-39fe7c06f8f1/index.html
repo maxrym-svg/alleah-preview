@@ -42,11 +42,11 @@ input{width:100%;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;borde
 .meter>div{height:100%;border-radius:4px}
 .small{font-size:12px;color:#9aa3ad;margin:2px 0}
 .task-full{white-space:pre-wrap;background:#12151a;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;max-height:320px;overflow-y:auto;font-size:14px}
-.streak-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid #3a2c1f;background:#1f1712;color:#ffb15c;cursor:pointer;user-select:none}
-.streak-chip:hover{border-color:#ffb15c}
+.streak-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid;cursor:pointer;user-select:none;transition:border-color .2s,background .2s,color .2s}
 .streak-chip .flame{flex:0 0 auto}
-.streak-pop{position:absolute;top:40px;left:14px;z-index:20;background:#1a1d23;border:1px solid #2c313a;border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:220px}
-.streak-pop-title{font-size:12px;color:#9aa3ad;margin:0 0 8px}
+.streak-pop{position:absolute;top:40px;left:14px;z-index:20;background:#1a1d23;border:1px solid #2c313a;border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:230px}
+.streak-pop-title{font-size:12px;color:#9aa3ad;margin:0 0 2px;font-weight:600}
+.streak-pop-sub{font-size:11px;color:#5c636e;margin:0 0 8px}
 .streak-days{display:flex;gap:8px;justify-content:space-between}
 .streak-day{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:#9aa3ad}
 .streak-day .flame{opacity:.25}
@@ -92,10 +92,35 @@ function computeStreakInfo(activeSet) {
   return { streak, last7 };
 }
 
+// Flame colour + label scale with streak length - a 1-day streak looks nothing
+// like a 60-day one. Ordered ascending by `.min`; last matching tier wins.
+const STREAK_TIERS = [
+  { min: 0,  color: '#5c636e', label: 'No streak yet' },
+  { min: 1,  color: '#ffb15c', label: 'Just started' },
+  { min: 3,  color: '#ff9142', label: 'Building' },
+  { min: 7,  color: '#ff6a3d', label: 'On fire' },
+  { min: 14, color: '#ff3b3b', label: 'Blazing' },
+  { min: 30, color: '#c084fc', label: 'Unstoppable' },
+  { min: 60, color: '#60a5fa', label: 'Legendary' },
+];
+
+function streakTier(n) {
+  let t = STREAK_TIERS[0];
+  for (const tier of STREAK_TIERS) if (n >= tier.min) t = tier;
+  return t;
+}
+
+function hexToRgba(hex, a) {
+  const m = hex.replace('#', '');
+  const r = parseInt(m.substring(0, 2), 16), g = parseInt(m.substring(2, 4), 16), b = parseInt(m.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
 function FlameIcon(props) {
   const size = props.size || 14;
   const color = props.color || 'currentColor';
-  return h('svg', {className:'flame', width:size, height:size, viewBox:'0 0 24 24', fill:color},
+  const dim = props.dim;
+  return h('svg', {className:'flame', width:size, height:size, viewBox:'0 0 24 24', fill: dim ? '#5c636e' : color, style: dim ? {opacity:.35} : undefined},
     h('path', {d:'M12 2c1 3-2 4.5-2 7.5a2 2 0 0 0 4 0c0-1-.5-1.5-.5-1.5 2 1 3.5 3.5 3.5 6a5.5 5.5 0 0 1-11 0C6 9.5 9.5 8 12 2z'}));
 }
 
@@ -108,20 +133,27 @@ function StreakChip(props) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
   const info = props.info;
+  const tier = streakTier(info.streak);
   return h('div', {ref, style:{position:'relative'}},
-    h('div', {className:'streak-chip', onClick:() => setOpen(o => !o), title:'Daily streak'},
-      h(FlameIcon, {size:14, color:'#ffb15c'}),
+    h('div', {
+      className:'streak-chip',
+      style:{borderColor: tier.color, background: hexToRgba(tier.color, 0.14), color: tier.color},
+      onClick:() => setOpen(o => !o),
+      title:'Daily streak',
+    },
+      h(FlameIcon, {size:14, color: tier.color}),
       h('span', null, info.streak)),
     open ? h('div', {className:'streak-pop'},
       h('p', {className:'streak-pop-title'}, info.streak > 0
-        ? info.streak + '-day streak · last 7 days'
-        : 'No active streak yet · last 7 days'),
+        ? info.streak + '-day streak'
+        : 'No active streak yet'),
+      h('p', {className:'streak-pop-sub'}, tier.label + ' \u00b7 last 7 days'),
       h('div', {className:'streak-days'},
         info.last7.map((d) => h('div', {
           key: d.date,
           className: 'streak-day' + (d.active ? ' active' : '') + (d.today ? ' today' : ''),
         },
-          h(FlameIcon, {size:16, color: d.active ? '#ffb15c' : '#5c636e'}),
+          h(FlameIcon, {size:16, color: tier.color, dim: !d.active}),
           h('span', null, d.label)))),
     ) : null);
 }
