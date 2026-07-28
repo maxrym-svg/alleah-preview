@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Alleah</title>
+<title>Alleah — preview</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f1115">
 <style>
@@ -27,7 +27,7 @@ button:disabled{opacity:.5}
 .err{color:#ff7b72;font-size:14px;padding:0 14px}
 .typing{align-self:flex-start;color:#9aa3ad;font-size:14px;padding:0 6px}
 #tasks{flex:1;overflow-y:auto;padding:8px 14px}
-.card{background:#161a20;border:1px solid #2c313a;border-radius:12px;padding:12px;margin-bottom:10px}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
 .dot{width:8px;height:8px;border-radius:50%}
 .pulse{animation:pulse 1.5s infinite}
@@ -49,300 +49,274 @@ button:disabled{opacity:.5}
 .streak-day .flame{opacity:.25}
 .streak-day.active .flame{opacity:1}
 .streak-day.today{color:#e6e6e6;font-weight:600}
-.demo-banner{font-size:11px;color:#5c636e;text-align:center;padding:6px 0 0}
+.preview-tag{position:fixed;bottom:8px;right:10px;font-size:10px;color:#5c636e;letter-spacing:.03em;z-index:5}
 </style></head><body>
 <div id="root"></div>
+<div class="preview-tag">STATIC PREVIEW · demo data</div>
 <script>
-// ============================================================================
-// Alleah - home view preview (daily-streak counter chip)
-// Fully self-contained static demo. No network calls, no auth, no backend.
-// All data below is synthetic/generic fixture data baked in for preview only.
-// ============================================================================
-(function () {
-  var root = document.getElementById('root');
+"use strict";
 
-  // ---- synthetic fixtures -------------------------------------------------
-  function isoDate(d) { return d.toISOString().slice(0, 10); }
+// ============================================================
+// Baked demo fixtures only. Nothing here makes a network call -
+// this is a self-contained preview of the home header streak chip.
+// ============================================================
 
-  // Build a synthetic "last 30 active days" set: an unbroken 5-day streak
-  // ending today, plus a couple of older scattered active days.
-  var today = new Date(); today.setUTCHours(0, 0, 0, 0);
-  function daysAgoIso(n) { var d = new Date(today); d.setUTCDate(d.getUTCDate() - n); return isoDate(d); }
-  var ACTIVE_DAYS = new Set([
-    daysAgoIso(0), daysAgoIso(1), daysAgoIso(2), daysAgoIso(3), daysAgoIso(4),
-    daysAgoIso(9), daysAgoIso(10), daysAgoIso(15)
-  ]);
+function isoDate(d) { return d.toISOString().slice(0, 10); }
 
-  var DEMO_MESSAGES = [
-    { role: 'assistant', content: "Hey! I remembered you're prepping the Q3 deck - want the notes from last time?" },
-    { role: 'user', content: 'Yes please, and remind me who owns the budget slide.' },
-    { role: 'assistant', content: "Priya owns the budget slide. Your notes: switch the chart to quarterly view, cut the roadmap slide in half.", folders: [{ n: 1, title: 'Q3 Planning' }] }
-  ];
-
-  var DEMO_TASKS = [
-    { id: 't1', status: 'running', instruction: 'Summarize the last 10 meeting notes into a one-page brief and flag any open action items.', progress: 'reading note 7 of 10', steps_used: 11, spend_usd: 0.09, created_at: minsAgo(6), completed_at: null },
-    { id: 't2', status: 'done', instruction: 'Draft a follow-up email to the design team about the icon set review.', steps_used: 6, spend_usd: 0.03, created_at: minsAgo(190), completed_at: minsAgo(180), result: "Draft sent to your outbox:\n\nSubject: Icon set review - a few notes\n\nHi team, quick follow up on Tuesday's review..." },
-    { id: 't3', status: 'failed', instruction: 'Pull the latest analytics export and chart weekly active users.', steps_used: 3, spend_usd: 0.01, created_at: minsAgo(1400), completed_at: minsAgo(1395), error: 'Source export was not reachable from this workspace.' }
-  ];
-
-  function minsAgo(m) { return new Date(Date.now() - m * 60000).toISOString(); }
-
-  // ---- streak logic (mirrors the real app; local-state only in this demo) --
-  function computeStreakInfo(activeSet) {
-    var last7 = [];
-    for (var i = 6; i >= 0; i--) {
-      var d = new Date(today); d.setUTCDate(d.getUTCDate() - i);
-      var iso = isoDate(d);
-      last7.push({
-        date: iso,
-        active: activeSet.has(iso),
-        label: d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 1),
-        today: i === 0
-      });
-    }
-    var streak = 0;
-    var cursor = new Date(today);
-    if (!activeSet.has(isoDate(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
-    while (activeSet.has(isoDate(cursor))) { streak++; cursor.setUTCDate(cursor.getUTCDate() - 1); }
-    return { streak: streak, last7: last7 };
-  }
-
-  // Flame colour + label scale with streak length. Ordered ascending by
-  // `.min`; last matching tier wins. Kept identical to the promotable app.
-  var STREAK_TIERS = [
-    { min: 0, color: '#5c636e', label: 'No streak yet' },
-    { min: 1, color: '#ffb15c', label: 'Just started' },
-    { min: 3, color: '#ff9142', label: 'Building' },
-    { min: 7, color: '#ff6a3d', label: 'On fire' },
-    { min: 14, color: '#ff3b3b', label: 'Blazing' },
-    { min: 30, color: '#c084fc', label: 'Unstoppable' },
-    { min: 60, color: '#60a5fa', label: 'Legendary' }
-  ];
-  function streakTier(n) {
-    var t = STREAK_TIERS[0];
-    for (var i = 0; i < STREAK_TIERS.length; i++) if (n >= STREAK_TIERS[i].min) t = STREAK_TIERS[i];
-    return t;
-  }
-  function hexToRgba(hex, a) {
-    var m = hex.replace('#', '');
-    var r = parseInt(m.substring(0, 2), 16), g = parseInt(m.substring(2, 4), 16), b = parseInt(m.substring(4, 6), 16);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
-  }
-
-  // ---- tiny DOM helpers ----------------------------------------------------
-  function el(tag, attrs, children) {
-    var node = document.createElement(tag);
-    attrs = attrs || {};
-    for (var k in attrs) {
-      if (k === 'class') node.className = attrs[k];
-      else if (k === 'style') node.setAttribute('style', attrs[k]);
-      else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
-      else if (k === 'html') node.innerHTML = attrs[k];
-      else node.setAttribute(k, attrs[k]);
-    }
-    (children || []).forEach(function (c) {
-      if (c == null) return;
-      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+function computeStreakInfo(activeSet) {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const last7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const iso = isoDate(d);
+    last7.push({
+      date: iso,
+      active: activeSet.has(iso),
+      label: d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 1),
+      today: i === 0,
     });
-    return node;
   }
-
-  function flameSvg(size, color, dim) {
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'flame');
-    svg.setAttribute('width', size); svg.setAttribute('height', size);
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', dim ? '#5c636e' : color);
-    if (dim) svg.style.opacity = '.35';
-    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M12 2c1 3-2 4.5-2 7.5a2 2 0 0 0 4 0c0-1-.5-1.5-.5-1.5 2 1 3.5 3.5 3.5 6a5.5 5.5 0 0 1-11 0C6 9.5 9.5 8 12 2z');
-    svg.appendChild(path);
-    return svg;
+  let streak = 0;
+  const cursor = new Date(today);
+  if (!activeSet.has(isoDate(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  while (activeSet.has(isoDate(cursor))) {
+    streak++;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
+  return { streak, last7 };
+}
 
-  // ---- streak chip + popover ----------------------------------------------
-  function StreakChip(info) {
-    var wrap = el('div', { style: 'position:relative' }, []);
-    var tier = streakTier(info.streak);
-    var open = false;
-
-    var chip = el('div', {
-      class: 'streak-chip',
-      style: 'border-color:' + tier.color + ';background:' + hexToRgba(tier.color, 0.14) + ';color:' + tier.color,
-      title: 'Daily streak'
-    }, [flameSvg(14, tier.color, false), el('span', {}, [String(info.streak)])]);
-
-    var pop = null;
-    function renderPop() {
-      var days = el('div', { class: 'streak-days' }, info.last7.map(function (d) {
-        return el('div', { class: 'streak-day' + (d.active ? ' active' : '') + (d.today ? ' today' : '') }, [
-          flameSvg(16, tier.color, !d.active),
-          el('span', {}, [d.label])
-        ]);
-      }));
-      return el('div', { class: 'streak-pop' }, [
-        el('p', { class: 'streak-pop-title' }, [info.streak > 0 ? (info.streak + '-day streak') : 'No active streak yet']),
-        el('p', { class: 'streak-pop-sub' }, [tier.label + ' \u00b7 last 7 days']),
-        days
-      ]);
-    }
-
-    chip.addEventListener('click', function (e) {
-      e.stopPropagation();
-      open = !open;
-      if (open) { pop = renderPop(); wrap.appendChild(pop); }
-      else if (pop) { wrap.removeChild(pop); pop = null; }
-    });
-    document.addEventListener('mousedown', function (e) {
-      if (open && !wrap.contains(e.target)) { open = false; if (pop) { wrap.removeChild(pop); pop = null; } }
-    });
-
-    wrap.appendChild(chip);
-    return wrap;
+// Demo fixture: an unbroken 12-day streak, so all of the last 7 days show active.
+const DEMO_ACTIVE_DAYS = (function () {
+  const set = new Set();
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    set.add(isoDate(d));
   }
-
-  // ---- header ---------------------------------------------------------------
-  function Header(view, onToggleView) {
-    var streakInfo = computeStreakInfo(ACTIVE_DAYS);
-    var left = el('div', { style: 'display:flex;align-items:center;gap:10px' }, [
-      el('h1', {}, ['Alleah']),
-      StreakChip(streakInfo)
-    ]);
-    var right = el('div', { style: 'display:flex;gap:8px' }, [
-      el('button', { class: 'secondary', style: 'margin-top:0', onclick: onToggleView }, [view === 'tasks' ? 'Chat' : 'Tasks']),
-      el('button', { class: 'secondary', onclick: function () { alert('Demo preview - sign out is disabled.'); } }, ['Sign out'])
-    ]);
-    return el('header', {}, [left, right]);
-  }
-
-  // ---- chat view --------------------------------------------------------
-  function ChatView() {
-    var messages = DEMO_MESSAGES.slice();
-    var thread = el('div', { id: 'thread' }, []);
-    var text = '';
-
-    function renderThread() {
-      thread.innerHTML = '';
-      messages.forEach(function (m) {
-        thread.appendChild(el('div', { class: 'msg ' + m.role }, [m.content]));
-        if (m.folders && m.folders.length) {
-          thread.appendChild(el('div', { class: 'cites' }, ['memory: ' + m.folders.map(function (f) { return '[' + f.n + '] ' + f.title; }).join('  ')]));
-        }
-      });
-      thread.scrollTop = thread.scrollHeight;
-    }
-    renderThread();
-
-    var textarea = el('textarea', { placeholder: 'Message Alleah...', rows: 1 }, []);
-    textarea.addEventListener('input', function () { text = textarea.value; });
-    textarea.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    });
-    var sendBtn = el('button', { onclick: function () { send(); } }, ['Send']);
-
-    function send() {
-      var content = textarea.value.trim();
-      if (!content) return;
-      messages.push({ role: 'user', content: content });
-      textarea.value = ''; renderThread();
-      setTimeout(function () {
-        messages.push({ role: 'assistant', content: "(demo preview) I've noted that - this reply is canned since there's no live backend here." });
-        renderThread();
-      }, 500);
-    }
-
-    return el('div', { style: 'flex:1;display:flex;flex-direction:column;min-height:0' }, [
-      thread,
-      el('div', { class: 'composer' }, [textarea, sendBtn])
-    ]);
-  }
-
-  // ---- tasks view --------------------------------------------------------
-  var STATUS_COLOR = { queued: '#9aa3ad', running: '#3ecf8e', done: '#3ecf8e', capped: '#e0a458', failed: '#ff7b72', cancelled: '#5c636e' };
-  function fmtAge(iso) {
-    var m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + 'm ago';
-    if (m < 1440) return Math.floor(m / 60) + 'h ago';
-    return Math.floor(m / 1440) + 'd ago';
-  }
-
-  function TaskCard(t) {
-    var open = false;
-    var active = t.status === 'queued' || t.status === 'running';
-    var steps = Math.min(t.steps_used || 0, 25);
-    var spend = Math.min(Number(t.spend_usd) || 0, 0.5);
-    var spendRatio = spend / 0.5;
-    var endMs = t.completed_at ? new Date(t.completed_at).getTime() : Date.now();
-    var elapsedMs = Math.max(0, Math.min(endMs - new Date(t.created_at).getTime(), 15 * 60000));
-    var elapsed = Math.floor(elapsedMs / 60000) + 'm ' + Math.floor((elapsedMs % 60000) / 1000) + 's';
-    var spendColor = spendRatio < 0.5 ? '#3ecf8e' : spendRatio < 0.8 ? '#e0a458' : '#ff7b72';
-    var color = STATUS_COLOR[t.status] || '#9aa3ad';
-
-    var card = el('div', { class: 'card' }, []);
-    var top = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' }, [
-      el('span', { class: 'badge' }, [
-        el('span', { class: 'dot' + (t.status === 'running' ? ' pulse' : ''), style: 'background:' + color }, []),
-        el('span', { style: 'color:' + color }, [t.status])
-      ]),
-      el('span', { class: 'small' }, [fmtAge(t.created_at)])
-    ]);
-    card.appendChild(top);
-
-    var body = el('div', {}, []);
-    var instr = el('p', { style: 'margin:8px 0 4px;cursor:pointer' }, [t.instruction.length > 110 ? t.instruction.slice(0, 110) + '...' : t.instruction]);
-    instr.addEventListener('click', function () { open = !open; renderOpen(); });
-    body.appendChild(instr);
-
-    if (t.status === 'running' && t.progress) body.appendChild(el('p', { class: 'small', style: 'color:#e6e6e6' }, ['\u25b8 ' + t.progress]));
-
-    if (active) {
-      var actWrap = el('div', {}, [
-        el('div', { class: 'small' }, ['steps used: ' + steps + ' / 25']),
-        el('div', { class: 'segbar' }, Array.from({ length: 25 }, function (_, i) { return el('span', { class: 'seg' + (i < steps ? ' on' : '') }, []); })),
-        el('div', { class: 'small' }, ['spend: $' + spend.toFixed(2) + ' / $0.50 cap']),
-        el('div', { class: 'meter' }, [el('div', { style: 'width:' + (spendRatio * 100) + '%;background:' + spendColor }, [])]),
-        el('div', { class: 'small' }, ['time since queued: ' + elapsed + ' / 15m limit']),
-        el('div', { class: 'meter' }, [el('div', { style: 'width:' + (elapsedMs / (15 * 60000) * 100) + '%;background:#3ecf8e' }, [])])
-      ]);
-      body.appendChild(actWrap);
-    }
-
-    var openSlot = el('div', {}, []);
-    body.appendChild(openSlot);
-    card.appendChild(body);
-
-    function renderOpen() {
-      instr.textContent = open ? t.instruction : (t.instruction.length > 110 ? t.instruction.slice(0, 110) + '...' : t.instruction);
-      openSlot.innerHTML = '';
-      if (!open) return;
-      if (t.result) openSlot.appendChild(el('div', { class: 'task-full' }, [t.result]));
-      if (t.error) openSlot.appendChild(el('p', { class: 'err', style: 'padding:0' }, [t.error]));
-      openSlot.appendChild(el('p', { class: 'small' }, ['steps ' + (t.steps_used || 0) + ' \u00b7 $' + (Number(t.spend_usd) || 0).toFixed(2) +
-        ' \u00b7 queued ' + new Date(t.created_at).toLocaleString() + (t.completed_at ? ' \u00b7 finished ' + new Date(t.completed_at).toLocaleString() : '')]));
-    }
-
-    return card;
-  }
-
-  function TasksView() {
-    var wrap = el('div', { id: 'tasks' }, []);
-    DEMO_TASKS.forEach(function (t) { wrap.appendChild(TaskCard(t)); });
-    return wrap;
-  }
-
-  // ---- app shell ----------------------------------------------------------
-  var view = 'chat';
-  function renderApp() {
-    root.innerHTML = '';
-    var container = el('div', { style: 'height:100%;display:flex;flex-direction:column' }, []);
-    container.appendChild(Header(view, function () { view = view === 'tasks' ? 'chat' : 'tasks'; renderApp(); }));
-    container.appendChild(view === 'tasks' ? TasksView() : ChatView());
-    container.appendChild(el('p', { class: 'demo-banner' }, ['Static preview \u00b7 synthetic demo data \u00b7 no live backend']));
-    root.appendChild(container);
-  }
-  renderApp();
+  return set;
 })();
+
+const STREAK_TIERS = [
+  { min: 0,  color: '#5c636e', label: 'No streak yet' },
+  { min: 1,  color: '#ffb15c', label: 'Just started' },
+  { min: 3,  color: '#ff9142', label: 'Building' },
+  { min: 7,  color: '#ff6a3d', label: 'On fire' },
+  { min: 14, color: '#ff3b3b', label: 'Blazing' },
+  { min: 30, color: '#c084fc', label: 'Unstoppable' },
+  { min: 60, color: '#60a5fa', label: 'Legendary' },
+];
+
+function streakTier(n) {
+  let t = STREAK_TIERS[0];
+  for (const tier of STREAK_TIERS) if (n >= tier.min) t = tier;
+  return t;
+}
+
+function hexToRgba(hex, a) {
+  const m = hex.replace('#', '');
+  const r = parseInt(m.substring(0, 2), 16), g = parseInt(m.substring(2, 4), 16), b = parseInt(m.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function flameSvg(size, color, dim) {
+  const fill = dim ? '#5c636e' : color;
+  const style = dim ? ' style="opacity:.35"' : '';
+  return `<svg class="flame" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}"${style}>` +
+    `<path d="M12 2c1 3-2 4.5-2 7.5a2 2 0 0 0 4 0c0-1-.5-1.5-.5-1.5 2 1 3.5 3.5 3.5 6a5.5 5.5 0 0 1-11 0C6 9.5 9.5 8 12 2z"/></svg>`;
+}
+
+function renderStreakChip(container, info) {
+  const tier = streakTier(info.streak);
+  container.innerHTML = `
+    <div class="streak-chip" style="border-color:${tier.color};background:${hexToRgba(tier.color, 0.14)};color:${tier.color}" title="Daily streak">
+      ${flameSvg(14, tier.color, false)}
+      <span>${info.streak}</span>
+    </div>
+    <div class="streak-pop" hidden>
+      <p class="streak-pop-title">${info.streak > 0 ? info.streak + '-day streak' : 'No active streak yet'}</p>
+      <p class="streak-pop-sub">${tier.label} &middot; last 7 days</p>
+      <div class="streak-days">
+        ${info.last7.map(d => `
+          <div class="streak-day${d.active ? ' active' : ''}${d.today ? ' today' : ''}">
+            ${flameSvg(16, tier.color, !d.active)}
+            <span>${d.label}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  const chip = container.querySelector('.streak-chip');
+  const pop = container.querySelector('.streak-pop');
+  chip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.hidden = !pop.hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if (!container.contains(e.target)) pop.hidden = true;
+  });
+}
+
+// ===== Demo chat fixtures =====
+const DEMO_MESSAGES = [
+  { role: 'user', content: 'Remind me what I told you about the Nord Theory sprint plan.' },
+  { role: 'assistant', content: 'You framed it as three phases: discovery, a two-week build, then a soak week before launch. You flagged the soak week as the part most likely to get cut under time pressure.',
+    folders: [{ n: 1, title: 'Nord Theory — sprint plan' }] },
+  { role: 'user', content: 'Good. Log that I want to protect the soak week no matter what.' },
+  { role: 'assistant', content: 'Got it — noted as a standing preference tied to the sprint plan folder.',
+    folders: [{ n: 1, title: 'Nord Theory — sprint plan' }] },
+];
+
+// ===== Demo task fixtures =====
+const DEMO_TASKS = [
+  {
+    id: 't1', status: 'running', instruction: 'Summarize the last 10 memory folders tagged "sprint" into a one-page brief.',
+    steps_used: 9, spend_usd: 0.14, created_at: new Date(Date.now() - 3 * 60000).toISOString(), progress: 'reading folder 7 of 10',
+  },
+  {
+    id: 't2', status: 'done', instruction: 'Draft three follow-up questions for the Nord Theory retro.',
+    steps_used: 4, spend_usd: 0.05, created_at: new Date(Date.now() - 90 * 60000).toISOString(),
+    completed_at: new Date(Date.now() - 86 * 60000).toISOString(),
+    result: '1. What made the soak week feel negotiable in the first place?\n2. Which phase had the least accurate original estimate?\n3. What would "protecting" the soak week look like concretely next sprint?',
+  },
+  {
+    id: 't3', status: 'failed', instruction: 'Cross-link every project folder created this month with related people folders.',
+    steps_used: 22, spend_usd: 0.41, created_at: new Date(Date.now() - 26 * 3600000).toISOString(),
+    completed_at: new Date(Date.now() - 25 * 3600000).toISOString(), error: 'Error: step budget exhausted before linking finished.',
+  },
+];
+
+const STATUS_COLOR = { queued: '#9aa3ad', running: '#3ecf8e', done: '#3ecf8e', capped: '#e0a458', failed: '#ff7b72', cancelled: '#5c636e' };
+
+function fmtAge(iso) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.floor(m / 60) + 'h ago';
+  return Math.floor(m / 1440) + 'd ago';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderThread(threadEl, messages) {
+  threadEl.innerHTML = messages.map(m => `
+    <div class="msg ${m.role}">${escapeHtml(m.content)}</div>
+    ${m.folders && m.folders.length ? `<div class="cites">memory: ${m.folders.map(f => '[' + f.n + '] ' + escapeHtml(f.title)).join('  ')}</div>` : ''}
+  `).join('');
+  threadEl.scrollTop = threadEl.scrollHeight;
+}
+
+function renderTasks(tasksEl, tasks) {
+  tasksEl.innerHTML = tasks.map(t => {
+    const active = t.status === 'queued' || t.status === 'running';
+    const steps = Math.min(t.steps_used || 0, 25);
+    const spend = Math.min(Number(t.spend_usd) || 0, 0.5);
+    const spendRatio = spend / 0.5;
+    const endMs = t.completed_at ? new Date(t.completed_at).getTime() : Date.now();
+    const elapsedMs = Math.max(0, Math.min(endMs - new Date(t.created_at).getTime(), 15 * 60000));
+    const elapsed = Math.floor(elapsedMs / 60000) + 'm ' + Math.floor((elapsedMs % 60000) / 1000) + 's';
+    const spendColor = spendRatio < 0.5 ? '#3ecf8e' : spendRatio < 0.8 ? '#e0a458' : '#ff7b72';
+    const color = STATUS_COLOR[t.status] || '#9aa3ad';
+    const shortInstruction = t.instruction.length > 110 ? t.instruction.slice(0, 110) + '...' : t.instruction;
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span class="badge"><span class="dot${t.status === 'running' ? ' pulse' : ''}" style="background:${color}"></span><span style="color:${color}">${t.status}</span></span>
+          <span class="small">${fmtAge(t.created_at)}</span>
+        </div>
+        <p style="margin:8px 0 4px">${escapeHtml(shortInstruction)}</p>
+        ${t.status === 'running' && t.progress ? `<p class="small" style="color:#e6e6e6">▸ ${escapeHtml(t.progress)}</p>` : ''}
+        ${active ? `
+          <div>
+            <div class="small">steps used: ${steps} / 25</div>
+            <div class="segbar">${Array.from({ length: 25 }, (_, i) => `<span class="seg${i < steps ? ' on' : ''}"></span>`).join('')}</div>
+            <div class="small">spend: $${spend.toFixed(2)} / $0.50 cap</div>
+            <div class="meter"><div style="width:${spendRatio * 100}%;background:${spendColor}"></div></div>
+            <div class="small">time since queued: ${elapsed} / 15m limit</div>
+            <div class="meter"><div style="width:${elapsedMs / (15 * 60000) * 100}%;background:#3ecf8e"></div></div>
+          </div>` : ''}
+        ${t.result ? `<div class="task-full">${escapeHtml(t.result)}</div>` : ''}
+        ${t.error ? `<p class="err" style="padding:0">${escapeHtml(t.error)}</p>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function main() {
+  const root = document.getElementById('root');
+  root.innerHTML = `
+    <header>
+      <div style="display:flex;align-items:center;gap:10px">
+        <h1>Alleah</h1>
+        <div class="streak-chip-wrap" style="position:relative"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="secondary" id="viewToggle" style="margin-top:0">Tasks</button>
+        <button class="secondary" id="newChat">New chat</button>
+        <button class="secondary" id="signOut">Sign out</button>
+      </div>
+    </header>
+    <div id="thread"></div>
+    <div id="tasks" hidden></div>
+    <div class="composer" id="composer">
+      <textarea id="composerInput" placeholder="Message Alleah..." rows="1"></textarea>
+      <button id="sendBtn">Send</button>
+    </div>`;
+
+  renderStreakChip(root.querySelector('.streak-chip-wrap'), computeStreakInfo(DEMO_ACTIVE_DAYS));
+
+  const thread = root.querySelector('#thread');
+  const tasksEl = root.querySelector('#tasks');
+  const composer = root.querySelector('#composer');
+  const viewToggle = root.querySelector('#viewToggle');
+  const input = root.querySelector('#composerInput');
+  const sendBtn = root.querySelector('#sendBtn');
+
+  let messages = DEMO_MESSAGES.slice();
+  renderThread(thread, messages);
+  renderTasks(tasksEl, DEMO_TASKS);
+
+  let view = 'chat';
+  viewToggle.addEventListener('click', () => {
+    view = view === 'tasks' ? 'chat' : 'tasks';
+    thread.hidden = view === 'tasks';
+    composer.hidden = view === 'tasks';
+    tasksEl.hidden = view !== 'tasks';
+    viewToggle.textContent = view === 'tasks' ? 'Chat' : 'Tasks';
+  });
+
+  root.querySelector('#newChat').addEventListener('click', () => {
+    if (confirm('Clear this conversation? (Your memory folders are not affected.) [Preview: local demo state only]')) {
+      messages = [];
+      renderThread(thread, messages);
+    }
+  });
+
+  root.querySelector('#signOut').addEventListener('click', () => {
+    alert('Preview only — sign out is disabled in this static demo.');
+  });
+
+  function send() {
+    const content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+    messages = messages.concat([{ role: 'user', content }]);
+    renderThread(thread, messages);
+    setTimeout(() => {
+      messages = messages.concat([{ role: 'assistant', content: '(Preview demo — replies are canned. Real Alleah would answer using your memory folders here.)' }]);
+      renderThread(thread, messages);
+    }, 350);
+  }
+  sendBtn.addEventListener('click', send);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+}
+
+main();
 </script>
 
 <style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
@@ -481,7 +455,7 @@ button:disabled{opacity:.5}
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "b518c3a3-f019-414e-ae6d-39fe7c06f8f1", "revision": 2, "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 1, "note": "Depending on the length of the streak make the flame change colours", "resolution": "resolved"}]}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "b518c3a3-f019-414e-ae6d-39fe7c06f8f1", "revision": 3, "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 1, "note": "Depending on the length of the streak make the flame change colours", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type

@@ -70,6 +70,10 @@ const HISTORY_KEY = "alleah_chat_v1";
 // function is missing (404/undefined function, RLS rejection, etc.) every call
 // is swallowed and the chip just renders from locally computed state (an empty
 // active-day set, i.e. a 0-day streak) instead of throwing or blanking the header.
+// This is intentionally schema-optional: there is no 00x_streak_days.sql
+// migration anywhere in this app. If/when a real `activity_days` table and
+// `mark_active_today` RPC are added in a future migration, this same code
+// will pick them up automatically - until then it degrades to local state.
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
 function computeStreakInfo(activeSet) {
