@@ -2,7 +2,8 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Alleah — preview</title>
+<title>Alleah</title>
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f1115">
 <style>
 :root{color-scheme:dark}
@@ -10,9 +11,7 @@
 html,body{height:100%}
 body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
 #root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;position:relative;gap:8px}
-.hleft{display:flex;align-items:center;gap:10px;min-width:0}
-.hright{display:flex;gap:8px;flex:0 0 auto}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;position:relative}
 h1{font-size:18px;margin:0}
 #thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px}
 .msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
@@ -28,7 +27,7 @@ button:disabled{opacity:.5}
 .err{color:#ff7b72;font-size:14px;padding:0 14px}
 .typing{align-self:flex-start;color:#9aa3ad;font-size:14px;padding:0 6px}
 #tasks{flex:1;overflow-y:auto;padding:8px 14px}
-.card{border:1px solid #2c313a;border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#14171d}
+.card{background:#161a20;border:1px solid #2c313a;border-radius:12px;padding:12px;margin-bottom:10px}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
 .dot{width:8px;height:8px;border-radius:50%}
 .pulse{animation:pulse 1.5s infinite}
@@ -40,12 +39,9 @@ button:disabled{opacity:.5}
 .meter>div{height:100%;border-radius:4px}
 .small{font-size:12px;color:#9aa3ad;margin:2px 0}
 .task-full{white-space:pre-wrap;background:#12151a;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;max-height:320px;overflow-y:auto;font-size:14px}
-.banner{font-size:12px;color:#08130d;background:#3ecf8e;text-align:center;padding:4px 8px}
-
-.streak-wrap{position:relative}
 .streak-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid;cursor:pointer;user-select:none;transition:border-color .2s,background .2s,color .2s}
 .streak-chip .flame{flex:0 0 auto}
-.streak-pop{position:absolute;top:34px;left:0;z-index:20;background:#1a1d23;border:1px solid #2c313a;border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:230px}
+.streak-pop{position:absolute;top:40px;left:14px;z-index:20;background:#1a1d23;border:1px solid #2c313a;border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:230px}
 .streak-pop-title{font-size:12px;color:#9aa3ad;margin:0 0 2px;font-weight:600}
 .streak-pop-sub{font-size:11px;color:#5c636e;margin:0 0 8px}
 .streak-days{display:flex;gap:8px;justify-content:space-between}
@@ -53,275 +49,299 @@ button:disabled{opacity:.5}
 .streak-day .flame{opacity:.25}
 .streak-day.active .flame{opacity:1}
 .streak-day.today{color:#e6e6e6;font-weight:600}
-.streak-demo{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed #2c313a}
-.streak-demo button{padding:0 10px;height:26px;border-radius:8px;font-size:14px;line-height:1;background:#2c313a;color:#e6e6e6}
+.demo-banner{font-size:11px;color:#5c636e;text-align:center;padding:6px 0 0}
 </style></head><body>
-<div class="banner">Static preview — synthetic demo data, no live accounts or network calls</div>
 <div id="root"></div>
 <script>
-(function(){
-  var h = function(tag, attrs){
-    var el = document.createElement(tag);
-    attrs = attrs || {};
-    for (var k in attrs) {
-      if (k === 'class') el.className = attrs[k];
-      else if (k === 'style') el.setAttribute('style', attrs[k]);
-      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), attrs[k]);
-      else if (k === 'html') el.innerHTML = attrs[k];
-      else el.setAttribute(k, attrs[k]);
-    }
-    for (var i = 2; i < arguments.length; i++) {
-      var c = arguments[i];
-      if (c == null) continue;
-      if (Array.isArray(c)) c.forEach(function(cc){ if (cc) el.appendChild(cc); });
-      else if (typeof c === 'string') el.appendChild(document.createTextNode(c));
-      else el.appendChild(c);
-    }
-    return el;
-  };
+// ============================================================================
+// Alleah - home view preview (daily-streak counter chip)
+// Fully self-contained static demo. No network calls, no auth, no backend.
+// All data below is synthetic/generic fixture data baked in for preview only.
+// ============================================================================
+(function () {
+  var root = document.getElementById('root');
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
+  // ---- synthetic fixtures -------------------------------------------------
+  function isoDate(d) { return d.toISOString().slice(0, 10); }
+
+  // Build a synthetic "last 30 active days" set: an unbroken 5-day streak
+  // ending today, plus a couple of older scattered active days.
+  var today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  function daysAgoIso(n) { var d = new Date(today); d.setUTCDate(d.getUTCDate() - n); return isoDate(d); }
+  var ACTIVE_DAYS = new Set([
+    daysAgoIso(0), daysAgoIso(1), daysAgoIso(2), daysAgoIso(3), daysAgoIso(4),
+    daysAgoIso(9), daysAgoIso(10), daysAgoIso(15)
+  ]);
+
+  var DEMO_MESSAGES = [
+    { role: 'assistant', content: "Hey! I remembered you're prepping the Q3 deck - want the notes from last time?" },
+    { role: 'user', content: 'Yes please, and remind me who owns the budget slide.' },
+    { role: 'assistant', content: "Priya owns the budget slide. Your notes: switch the chart to quarterly view, cut the roadmap slide in half.", folders: [{ n: 1, title: 'Q3 Planning' }] }
+  ];
+
+  var DEMO_TASKS = [
+    { id: 't1', status: 'running', instruction: 'Summarize the last 10 meeting notes into a one-page brief and flag any open action items.', progress: 'reading note 7 of 10', steps_used: 11, spend_usd: 0.09, created_at: minsAgo(6), completed_at: null },
+    { id: 't2', status: 'done', instruction: 'Draft a follow-up email to the design team about the icon set review.', steps_used: 6, spend_usd: 0.03, created_at: minsAgo(190), completed_at: minsAgo(180), result: "Draft sent to your outbox:\n\nSubject: Icon set review - a few notes\n\nHi team, quick follow up on Tuesday's review..." },
+    { id: 't3', status: 'failed', instruction: 'Pull the latest analytics export and chart weekly active users.', steps_used: 3, spend_usd: 0.01, created_at: minsAgo(1400), completed_at: minsAgo(1395), error: 'Source export was not reachable from this workspace.' }
+  ];
+
+  function minsAgo(m) { return new Date(Date.now() - m * 60000).toISOString(); }
+
+  // ---- streak logic (mirrors the real app; local-state only in this demo) --
+  function computeStreakInfo(activeSet) {
+    var last7 = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(today); d.setUTCDate(d.getUTCDate() - i);
+      var iso = isoDate(d);
+      last7.push({
+        date: iso,
+        active: activeSet.has(iso),
+        label: d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 1),
+        today: i === 0
+      });
+    }
+    var streak = 0;
+    var cursor = new Date(today);
+    if (!activeSet.has(isoDate(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
+    while (activeSet.has(isoDate(cursor))) { streak++; cursor.setUTCDate(cursor.getUTCDate() - 1); }
+    return { streak: streak, last7: last7 };
   }
 
-  // ===== Daily streak: flame colour scales with streak length =====
-  var TIERS = [
-    {min: 0,  color: '#5c636e', label: 'No streak yet'},
-    {min: 1,  color: '#ffb15c', label: 'Just started'},
-    {min: 3,  color: '#ff9142', label: 'Building'},
-    {min: 7,  color: '#ff6a3d', label: 'On fire'},
-    {min: 14, color: '#ff3b3b', label: 'Blazing'},
-    {min: 30, color: '#c084fc', label: 'Unstoppable'},
-    {min: 60, color: '#60a5fa', label: 'Legendary'}
+  // Flame colour + label scale with streak length. Ordered ascending by
+  // `.min`; last matching tier wins. Kept identical to the promotable app.
+  var STREAK_TIERS = [
+    { min: 0, color: '#5c636e', label: 'No streak yet' },
+    { min: 1, color: '#ffb15c', label: 'Just started' },
+    { min: 3, color: '#ff9142', label: 'Building' },
+    { min: 7, color: '#ff6a3d', label: 'On fire' },
+    { min: 14, color: '#ff3b3b', label: 'Blazing' },
+    { min: 30, color: '#c084fc', label: 'Unstoppable' },
+    { min: 60, color: '#60a5fa', label: 'Legendary' }
   ];
-  function tierFor(n) {
-    var t = TIERS[0];
-    for (var i = 0; i < TIERS.length; i++) if (n >= TIERS[i].min) t = TIERS[i];
+  function streakTier(n) {
+    var t = STREAK_TIERS[0];
+    for (var i = 0; i < STREAK_TIERS.length; i++) if (n >= STREAK_TIERS[i].min) t = STREAK_TIERS[i];
     return t;
   }
   function hexToRgba(hex, a) {
-    var m = hex.replace('#','');
-    var r = parseInt(m.substring(0,2),16), g = parseInt(m.substring(2,4),16), b = parseInt(m.substring(4,6),16);
+    var m = hex.replace('#', '');
+    var r = parseInt(m.substring(0, 2), 16), g = parseInt(m.substring(2, 4), 16), b = parseInt(m.substring(4, 6), 16);
     return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
   }
-  function flameSvg(size, color, dim) {
-    return '<svg class="flame" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="' +
-      (dim ? '#5c636e' : color) + '" style="' + (dim ? 'opacity:.35' : '') + '">' +
-      '<path d="M12 2c1 3-2 4.5-2 7.5a2 2 0 0 0 4 0c0-1-.5-1.5-.5-1.5 2 1 3.5 3.5 3.5 6a5.5 5.5 0 0 1-11 0C6 9.5 9.5 8 12 2z"/></svg>';
-  }
 
-  var DOW = ['S','M','T','W','T','F','S'];
-  function last7For(streak) {
-    var active = Math.max(0, Math.min(streak, 7));
-    var days = [];
-    var today = new Date();
-    for (var i = 6; i >= 0; i--) {
-      var d = new Date(today);
-      d.setDate(d.getDate() - i);
-      days.push({ label: DOW[d.getDay()], active: i < active, today: i === 0 });
+  // ---- tiny DOM helpers ----------------------------------------------------
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    for (var k in attrs) {
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'style') node.setAttribute('style', attrs[k]);
+      else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+      else if (k === 'html') node.innerHTML = attrs[k];
+      else node.setAttribute(k, attrs[k]);
     }
-    return days;
+    (children || []).forEach(function (c) {
+      if (c == null) return;
+      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return node;
   }
 
-  // ===== Fixture data (synthetic, static) =====
-  var state = {
-    view: 'chat',
-    streak: 16,
-    popoverOpen: false,
-    busy: false,
-    messages: [
-      {role:'assistant', content:"Hey — welcome back. I remembered you're prepping the Q3 offsite deck."},
-      {role:'user', content:"Yeah. Can you pull up what I told you about the venue shortlist?"},
-      {role:'assistant', content:"You'd narrowed it to Cedar Hall and The Boathouse, leaning Cedar Hall for the AV setup.", folders:[{n:1, title:'Q3 Offsite'}, {n:2, title:'Venues'}]}
-    ],
-    tasks: [
-      {id:'t1', status:'running', instruction:'Summarize last week\u2019s standup notes into action items and owners.', progress:'reading source notes (3/5)', steps_used: 9, spend_usd: 0.11, created_at: new Date(Date.now()-6*60000).toISOString()},
-      {id:'t2', status:'done', instruction:'Draft a follow-up email to the Cedar Hall venue contact confirming the March 14 hold.', result:'Subject: Confirming March 14 hold — Cedar Hall\n\nHi Priya,\n\nConfirming we\u2019d like to hold Cedar Hall for March 14 (est. 40 guests). Could you send the updated contract?\n\nThanks,\nAlleah on behalf of the team', steps_used: 14, spend_usd: 0.18, created_at: new Date(Date.now()-3*3600000).toISOString(), completed_at: new Date(Date.now()-3*3600000+240000).toISOString()},
-      {id:'t3', status:'failed', instruction:'Cross-check budget spreadsheet totals against the vendor invoices folder.', error:'Could not locate a linked spreadsheet in memory — ask to attach one first.', steps_used: 4, spend_usd: 0.04, created_at: new Date(Date.now()-26*3600000).toISOString(), completed_at: new Date(Date.now()-26*3600000+90000).toISOString()},
-      {id:'t4', status:'cancelled', instruction:'Generate five icebreaker prompts for the offsite kickoff.', steps_used: 2, spend_usd: 0.01, created_at: new Date(Date.now()-49*3600000).toISOString(), completed_at: new Date(Date.now()-49*3600000+60000).toISOString()}
-    ]
-  };
+  function flameSvg(size, color, dim) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'flame');
+    svg.setAttribute('width', size); svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', dim ? '#5c636e' : color);
+    if (dim) svg.style.opacity = '.35';
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M12 2c1 3-2 4.5-2 7.5a2 2 0 0 0 4 0c0-1-.5-1.5-.5-1.5 2 1 3.5 3.5 3.5 6a5.5 5.5 0 0 1-11 0C6 9.5 9.5 8 12 2z');
+    svg.appendChild(path);
+    return svg;
+  }
 
-  var STATUS_COLOR = {queued:'#9aa3ad', running:'#3ecf8e', done:'#3ecf8e', capped:'#e0a458', failed:'#ff7b72', cancelled:'#5c636e'};
+  // ---- streak chip + popover ----------------------------------------------
+  function StreakChip(info) {
+    var wrap = el('div', { style: 'position:relative' }, []);
+    var tier = streakTier(info.streak);
+    var open = false;
 
+    var chip = el('div', {
+      class: 'streak-chip',
+      style: 'border-color:' + tier.color + ';background:' + hexToRgba(tier.color, 0.14) + ';color:' + tier.color,
+      title: 'Daily streak'
+    }, [flameSvg(14, tier.color, false), el('span', {}, [String(info.streak)])]);
+
+    var pop = null;
+    function renderPop() {
+      var days = el('div', { class: 'streak-days' }, info.last7.map(function (d) {
+        return el('div', { class: 'streak-day' + (d.active ? ' active' : '') + (d.today ? ' today' : '') }, [
+          flameSvg(16, tier.color, !d.active),
+          el('span', {}, [d.label])
+        ]);
+      }));
+      return el('div', { class: 'streak-pop' }, [
+        el('p', { class: 'streak-pop-title' }, [info.streak > 0 ? (info.streak + '-day streak') : 'No active streak yet']),
+        el('p', { class: 'streak-pop-sub' }, [tier.label + ' \u00b7 last 7 days']),
+        days
+      ]);
+    }
+
+    chip.addEventListener('click', function (e) {
+      e.stopPropagation();
+      open = !open;
+      if (open) { pop = renderPop(); wrap.appendChild(pop); }
+      else if (pop) { wrap.removeChild(pop); pop = null; }
+    });
+    document.addEventListener('mousedown', function (e) {
+      if (open && !wrap.contains(e.target)) { open = false; if (pop) { wrap.removeChild(pop); pop = null; } }
+    });
+
+    wrap.appendChild(chip);
+    return wrap;
+  }
+
+  // ---- header ---------------------------------------------------------------
+  function Header(view, onToggleView) {
+    var streakInfo = computeStreakInfo(ACTIVE_DAYS);
+    var left = el('div', { style: 'display:flex;align-items:center;gap:10px' }, [
+      el('h1', {}, ['Alleah']),
+      StreakChip(streakInfo)
+    ]);
+    var right = el('div', { style: 'display:flex;gap:8px' }, [
+      el('button', { class: 'secondary', style: 'margin-top:0', onclick: onToggleView }, [view === 'tasks' ? 'Chat' : 'Tasks']),
+      el('button', { class: 'secondary', onclick: function () { alert('Demo preview - sign out is disabled.'); } }, ['Sign out'])
+    ]);
+    return el('header', {}, [left, right]);
+  }
+
+  // ---- chat view --------------------------------------------------------
+  function ChatView() {
+    var messages = DEMO_MESSAGES.slice();
+    var thread = el('div', { id: 'thread' }, []);
+    var text = '';
+
+    function renderThread() {
+      thread.innerHTML = '';
+      messages.forEach(function (m) {
+        thread.appendChild(el('div', { class: 'msg ' + m.role }, [m.content]));
+        if (m.folders && m.folders.length) {
+          thread.appendChild(el('div', { class: 'cites' }, ['memory: ' + m.folders.map(function (f) { return '[' + f.n + '] ' + f.title; }).join('  ')]));
+        }
+      });
+      thread.scrollTop = thread.scrollHeight;
+    }
+    renderThread();
+
+    var textarea = el('textarea', { placeholder: 'Message Alleah...', rows: 1 }, []);
+    textarea.addEventListener('input', function () { text = textarea.value; });
+    textarea.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    var sendBtn = el('button', { onclick: function () { send(); } }, ['Send']);
+
+    function send() {
+      var content = textarea.value.trim();
+      if (!content) return;
+      messages.push({ role: 'user', content: content });
+      textarea.value = ''; renderThread();
+      setTimeout(function () {
+        messages.push({ role: 'assistant', content: "(demo preview) I've noted that - this reply is canned since there's no live backend here." });
+        renderThread();
+      }, 500);
+    }
+
+    return el('div', { style: 'flex:1;display:flex;flex-direction:column;min-height:0' }, [
+      thread,
+      el('div', { class: 'composer' }, [textarea, sendBtn])
+    ]);
+  }
+
+  // ---- tasks view --------------------------------------------------------
+  var STATUS_COLOR = { queued: '#9aa3ad', running: '#3ecf8e', done: '#3ecf8e', capped: '#e0a458', failed: '#ff7b72', cancelled: '#5c636e' };
   function fmtAge(iso) {
     var m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
     if (m < 1) return 'just now';
     if (m < 60) return m + 'm ago';
-    if (m < 1440) return Math.floor(m/60) + 'h ago';
-    return Math.floor(m/1440) + 'd ago';
+    if (m < 1440) return Math.floor(m / 60) + 'h ago';
+    return Math.floor(m / 1440) + 'd ago';
   }
 
-  // ===== Render =====
-  var root = document.getElementById('root');
-
-  function render() {
-    root.innerHTML = '';
-    root.appendChild(renderHeader());
-    if (state.view === 'tasks') root.appendChild(renderTasks());
-    else root.appendChild(renderChat());
-  }
-
-  function renderStreakChip() {
-    var tier = tierFor(state.streak);
-    var wrap = h('div', {class:'streak-wrap'});
-    var chip = h('div', {
-      class:'streak-chip',
-      style:'border-color:' + tier.color + ';background:' + hexToRgba(tier.color, 0.14) + ';color:' + tier.color,
-      title: 'Daily streak',
-      onclick: function(e){ e.stopPropagation(); state.popoverOpen = !state.popoverOpen; render(); }
-    });
-    chip.innerHTML = flameSvg(14, tier.color, false) + '<span>' + state.streak + '</span>';
-    wrap.appendChild(chip);
-
-    if (state.popoverOpen) {
-      var pop = h('div', {class:'streak-pop', onclick:function(e){ e.stopPropagation(); }});
-      pop.appendChild(h('p', {class:'streak-pop-title'},
-        state.streak > 0 ? state.streak + '-day streak' : 'No active streak yet'));
-      pop.appendChild(h('p', {class:'streak-pop-sub'}, tier.label + ' · last 7 days'));
-      var days = h('div', {class:'streak-days'});
-      last7For(state.streak).forEach(function(d){
-        var cell = h('div', {class:'streak-day' + (d.active ? ' active' : '') + (d.today ? ' today' : '')});
-        cell.innerHTML = flameSvg(16, tier.color, !d.active) + '<span>' + d.label + '</span>';
-        days.appendChild(cell);
-      });
-      pop.appendChild(days);
-      var demo = h('div', {class:'streak-demo'});
-      demo.appendChild(h('span', {class:'small'}, 'preview only: adjust streak'));
-      var btns = h('div', {style:'display:flex;gap:6px'});
-      btns.appendChild(h('button', {onclick:function(e){ e.stopPropagation(); state.streak = Math.max(0, state.streak - 1); render(); }}, '\u2212'));
-      btns.appendChild(h('button', {onclick:function(e){ e.stopPropagation(); state.streak = Math.min(120, state.streak + 1); render(); }}, '+'));
-      demo.appendChild(btns);
-      pop.appendChild(demo);
-      wrap.appendChild(pop);
-    }
-    return wrap;
-  }
-
-  function renderHeader() {
-    var header = h('header', {});
-    var left = h('div', {class:'hleft'});
-    left.appendChild(h('h1', {}, 'Alleah'));
-    left.appendChild(renderStreakChip());
-    header.appendChild(left);
-
-    var right = h('div', {class:'hright'});
-    right.appendChild(h('button', {class:'secondary', style:'margin-top:0', onclick:function(){ state.view = state.view === 'tasks' ? 'chat' : 'tasks'; render(); }}, state.view === 'tasks' ? 'Chat' : 'Tasks'));
-    right.appendChild(h('button', {class:'secondary', onclick:function(){ if (confirm('Clear this conversation? (Your memory folders are not affected.)')) { state.messages = []; render(); } }}, 'New chat'));
-    right.appendChild(h('button', {class:'secondary', onclick:function(){ alert('This is a static preview — sign out is disabled.'); }}, 'Sign out'));
-    header.appendChild(right);
-    return header;
-  }
-
-  function renderChat() {
-    var frag = document.createDocumentFragment();
-    var thread = h('div', {id:'thread'});
-    if (state.messages.length === 0) {
-      thread.appendChild(h('p', {class:'muted', style:'padding:0 6px'}, 'Talk to me. What you tell me about what you know gets remembered - automatically.'));
-    }
-    state.messages.forEach(function(m){
-      thread.appendChild(h('div', {class:'msg ' + m.role}, m.content));
-      if (m.folders && m.folders.length) {
-        thread.appendChild(h('div', {class:'cites'}, 'memory: ' + m.folders.map(function(f){ return '[' + f.n + '] ' + f.title; }).join('  ')));
-      }
-    });
-    if (state.busy) thread.appendChild(h('div', {class:'typing'}, 'thinking...'));
-    var endMarker = h('div', {});
-    thread.appendChild(endMarker);
-    frag.appendChild(thread);
-
-    var composer = h('div', {class:'composer'});
-    var ta = h('textarea', {placeholder:'Message Alleah...', rows:'1'});
-    var sendBtn = h('button', {onclick: function(){ send(ta.value); }}, 'Send');
-    ta.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(ta.value); }
-    });
-    composer.appendChild(ta);
-    composer.appendChild(sendBtn);
-    frag.appendChild(composer);
-
-    setTimeout(function(){ endMarker.scrollIntoView({behavior:'smooth'}); }, 0);
-    return frag;
-  }
-
-  function send(content) {
-    content = (content || '').trim();
-    if (!content || state.busy) return;
-    state.messages.push({role:'user', content: content});
-    state.busy = true;
-    render();
-    setTimeout(function(){
-      state.messages.push({role:'assistant', content: "Noted — I've filed that away. (This is a static preview, so replies are canned.)"});
-      state.busy = false;
-      render();
-    }, 700);
-  }
-
-  function renderTasks() {
-    var wrap = h('div', {id:'tasks'});
-    state.tasks.forEach(function(t){ wrap.appendChild(renderTaskCard(t)); });
-    return wrap;
-  }
-
-  function renderTaskCard(t) {
+  function TaskCard(t) {
+    var open = false;
     var active = t.status === 'queued' || t.status === 'running';
     var steps = Math.min(t.steps_used || 0, 25);
     var spend = Math.min(Number(t.spend_usd) || 0, 0.5);
     var spendRatio = spend / 0.5;
     var endMs = t.completed_at ? new Date(t.completed_at).getTime() : Date.now();
-    var elapsedMs = Math.max(0, Math.min(endMs - new Date(t.created_at).getTime(), 15*60000));
-    var elapsed = Math.floor(elapsedMs/60000) + 'm ' + Math.floor((elapsedMs%60000)/1000) + 's';
+    var elapsedMs = Math.max(0, Math.min(endMs - new Date(t.created_at).getTime(), 15 * 60000));
+    var elapsed = Math.floor(elapsedMs / 60000) + 'm ' + Math.floor((elapsedMs % 60000) / 1000) + 's';
     var spendColor = spendRatio < 0.5 ? '#3ecf8e' : spendRatio < 0.8 ? '#e0a458' : '#ff7b72';
     var color = STATUS_COLOR[t.status] || '#9aa3ad';
-    var open = !!t._open;
 
-    var card = h('div', {class:'card'});
-    var top = h('div', {style:'display:flex;justify-content:space-between;align-items:center;gap:8px'});
-    var badge = h('span', {class:'badge'});
-    badge.innerHTML = '<span class="dot' + (t.status==='running' ? ' pulse' : '') + '" style="background:' + color + '"></span><span style="color:' + color + '">' + t.status + '</span>';
-    top.appendChild(badge);
-    top.appendChild(h('span', {class:'small'}, fmtAge(t.created_at)));
-    if (active) {
-      top.appendChild(h('button', {class:'secondary', style:'margin-top:0;padding:4px 10px;font-size:12px', onclick:function(e){ e.stopPropagation(); if (confirm('Cancel this task?')) { t.status = 'cancelled'; render(); } }}, 'Cancel'));
-    }
+    var card = el('div', { class: 'card' }, []);
+    var top = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' }, [
+      el('span', { class: 'badge' }, [
+        el('span', { class: 'dot' + (t.status === 'running' ? ' pulse' : ''), style: 'background:' + color }, []),
+        el('span', { style: 'color:' + color }, [t.status])
+      ]),
+      el('span', { class: 'small' }, [fmtAge(t.created_at)])
+    ]);
     card.appendChild(top);
 
-    var instrEl = h('p', {style:'margin:8px 0 4px;cursor:pointer', onclick:function(){ t._open = !t._open; render(); }},
-      open ? t.instruction : (t.instruction.length > 110 ? t.instruction.slice(0,110) + '...' : t.instruction));
-    card.appendChild(instrEl);
+    var body = el('div', {}, []);
+    var instr = el('p', { style: 'margin:8px 0 4px;cursor:pointer' }, [t.instruction.length > 110 ? t.instruction.slice(0, 110) + '...' : t.instruction]);
+    instr.addEventListener('click', function () { open = !open; renderOpen(); });
+    body.appendChild(instr);
 
-    if (t.status === 'running' && t.progress) {
-      card.appendChild(h('p', {class:'small', style:'color:#e6e6e6'}, '\u25b8 ' + t.progress));
-    }
+    if (t.status === 'running' && t.progress) body.appendChild(el('p', { class: 'small', style: 'color:#e6e6e6' }, ['\u25b8 ' + t.progress]));
 
     if (active) {
-      var box = h('div', {});
-      box.appendChild(h('div', {class:'small'}, 'steps used: ' + steps + ' / 25'));
-      var segbar = h('div', {class:'segbar'});
-      for (var i = 0; i < 25; i++) segbar.appendChild(h('span', {class:'seg' + (i < steps ? ' on' : '')}));
-      box.appendChild(segbar);
-      box.appendChild(h('div', {class:'small'}, 'spend: $' + spend.toFixed(2) + ' / $0.50 cap'));
-      var m1 = h('div', {class:'meter'}); m1.appendChild(h('div', {style:'width:' + (spendRatio*100) + '%;background:' + spendColor})); box.appendChild(m1);
-      box.appendChild(h('div', {class:'small'}, 'time since queued: ' + elapsed + ' / 15m limit (worker may start up to 1m after queuing)'));
-      var m2 = h('div', {class:'meter'}); m2.appendChild(h('div', {style:'width:' + (elapsedMs/(15*60000)*100) + '%;background:#3ecf8e'})); box.appendChild(m2);
-      card.appendChild(box);
+      var actWrap = el('div', {}, [
+        el('div', { class: 'small' }, ['steps used: ' + steps + ' / 25']),
+        el('div', { class: 'segbar' }, Array.from({ length: 25 }, function (_, i) { return el('span', { class: 'seg' + (i < steps ? ' on' : '') }, []); })),
+        el('div', { class: 'small' }, ['spend: $' + spend.toFixed(2) + ' / $0.50 cap']),
+        el('div', { class: 'meter' }, [el('div', { style: 'width:' + (spendRatio * 100) + '%;background:' + spendColor }, [])]),
+        el('div', { class: 'small' }, ['time since queued: ' + elapsed + ' / 15m limit']),
+        el('div', { class: 'meter' }, [el('div', { style: 'width:' + (elapsedMs / (15 * 60000) * 100) + '%;background:#3ecf8e' }, [])])
+      ]);
+      body.appendChild(actWrap);
     }
 
-    if (open) {
-      if (t.result) card.appendChild(h('div', {class:'task-full'}, t.result));
-      if (t.error) card.appendChild(h('p', {class:'err', style:'padding:0'}, t.error));
-      card.appendChild(h('p', {class:'small'}, 'steps ' + (t.steps_used || 0) + ' \u00b7 $' + (Number(t.spend_usd)||0).toFixed(2) +
-        ' \u00b7 queued ' + new Date(t.created_at).toLocaleString() +
-        (t.completed_at ? ' \u00b7 finished ' + new Date(t.completed_at).toLocaleString() : '')));
+    var openSlot = el('div', {}, []);
+    body.appendChild(openSlot);
+    card.appendChild(body);
+
+    function renderOpen() {
+      instr.textContent = open ? t.instruction : (t.instruction.length > 110 ? t.instruction.slice(0, 110) + '...' : t.instruction);
+      openSlot.innerHTML = '';
+      if (!open) return;
+      if (t.result) openSlot.appendChild(el('div', { class: 'task-full' }, [t.result]));
+      if (t.error) openSlot.appendChild(el('p', { class: 'err', style: 'padding:0' }, [t.error]));
+      openSlot.appendChild(el('p', { class: 'small' }, ['steps ' + (t.steps_used || 0) + ' \u00b7 $' + (Number(t.spend_usd) || 0).toFixed(2) +
+        ' \u00b7 queued ' + new Date(t.created_at).toLocaleString() + (t.completed_at ? ' \u00b7 finished ' + new Date(t.completed_at).toLocaleString() : '')]));
     }
+
     return card;
   }
 
-  document.addEventListener('click', function(){ if (state.popoverOpen) { state.popoverOpen = false; render(); } });
+  function TasksView() {
+    var wrap = el('div', { id: 'tasks' }, []);
+    DEMO_TASKS.forEach(function (t) { wrap.appendChild(TaskCard(t)); });
+    return wrap;
+  }
 
-  render();
+  // ---- app shell ----------------------------------------------------------
+  var view = 'chat';
+  function renderApp() {
+    root.innerHTML = '';
+    var container = el('div', { style: 'height:100%;display:flex;flex-direction:column' }, []);
+    container.appendChild(Header(view, function () { view = view === 'tasks' ? 'chat' : 'tasks'; renderApp(); }));
+    container.appendChild(view === 'tasks' ? TasksView() : ChatView());
+    container.appendChild(el('p', { class: 'demo-banner' }, ['Static preview \u00b7 synthetic demo data \u00b7 no live backend']));
+    root.appendChild(container);
+  }
+  renderApp();
 })();
 </script>
 
@@ -461,7 +481,7 @@ button:disabled{opacity:.5}
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "b518c3a3-f019-414e-ae6d-39fe7c06f8f1", "revision": 1, "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 0, "note": "Depending on the length of the streak make the flame change colours", "resolution": "resolved"}]}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "b518c3a3-f019-414e-ae6d-39fe7c06f8f1", "revision": 2, "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 1, "note": "Depending on the length of the streak make the flame change colours", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type

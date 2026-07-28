@@ -63,7 +63,13 @@ const SB_URL = "https://sphnmcjlxxzgovisgepo.supabase.co";
 const supabase = createClient(SB_URL, "sb_publishable_vVfIttSbf_XLWKl2xahBWA_-sXU34L0");
 const HISTORY_KEY = "alleah_chat_v1";
 
-// ===== Daily streak (activity_days table, migration 006) =====
+// ===== Daily streak (home header chip) =====
+// Best-effort feature: it opportunistically calls an `activity_days` table and a
+// `mark_active_today` RPC if/when that backend exists, but never assumes either
+// is present. No matching migration ships with this feature - if the table or
+// function is missing (404/undefined function, RLS rejection, etc.) every call
+// is swallowed and the chip just renders from locally computed state (an empty
+// active-day set, i.e. a 0-day streak) instead of throwing or blanking the header.
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
 function computeStreakInfo(activeSet) {
@@ -192,24 +198,38 @@ function Chat(props) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [view, setView] = React.useState('chat');
-  const [streakInfo, setStreakInfo] = React.useState({streak: 0, last7: []});
+  // Local state is the source of truth for the chip. It starts as a 0-day
+  // streak computed from an empty set, and only gets upgraded if the
+  // best-effort backend calls below succeed.
+  const [streakInfo, setStreakInfo] = React.useState(() => computeStreakInfo(new Set()));
   const endRef = React.useRef(null);
   React.useEffect(() => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-60)));
     endRef.current && endRef.current.scrollIntoView({behavior:'smooth'});
   }, [messages, busy]);
 
-  // Mark today active (idempotent RPC), then load the last 30 days to derive the streak.
+  // Mark today active (idempotent RPC) and load the last 30 days to derive the
+  // streak. Both steps are independently best-effort: if `activity_days` /
+  // `mark_active_today` don't exist yet (no migration applied), we swallow the
+  // failure and keep showing the chip driven entirely by local state.
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      try { await supabase.rpc('mark_active_today'); } catch (_e) { /* best-effort */ }
-      const since = new Date();
-      since.setUTCDate(since.getUTCDate() - 30);
-      const r = await supabase.from('activity_days').select('day').gte('day', isoDate(since));
-      if (cancelled) return;
-      const activeSet = new Set((r.data || []).map(row => row.day));
-      setStreakInfo(computeStreakInfo(activeSet));
+      try {
+        await supabase.rpc('mark_active_today');
+      } catch (_e) { /* best-effort - no backing function, ignore */ }
+      try {
+        const since = new Date();
+        since.setUTCDate(since.getUTCDate() - 30);
+        const r = await supabase.from('activity_days').select('day').gte('day', isoDate(since));
+        if (cancelled) return;
+        if (r.error) throw r.error;
+        const activeSet = new Set((r.data || []).map(row => row.day));
+        setStreakInfo(computeStreakInfo(activeSet));
+      } catch (_e) {
+        // best-effort - no backing table, degrade gracefully to local state
+        if (!cancelled) setStreakInfo(computeStreakInfo(new Set()));
+      }
     })();
     return () => { cancelled = true; };
   }, []);
