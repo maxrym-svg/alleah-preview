@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah — header menu preview</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px}
+h1{font-size:18px;margin:0}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:#3ecf8e;color:#08130d;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:#1a1d23;border:1px solid #2c313a;border-bottom-left-radius:4px}
+.cites{align-self:flex-start;font-size:12px;color:#9aa3ad;margin-top:-4px;padding:0 6px}
+.composer{display:flex;gap:8px;padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+textarea{flex:1;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:120px}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;border-radius:8px}
+button:disabled{opacity:.5}
+.muted{color:#9aa3ad;font-size:14px}
+.err{color:#ff7b72;font-size:14px;padding:0 14px}
+.typing{align-self:flex-start;color:#9aa3ad;font-size:14px;padding:0 6px}
+#tasks{flex:1;overflow-y:auto;padding:8px 14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.segbar{display:flex;gap:2px;margin:4px 0}
+.seg{flex:1;height:8px;border-radius:2px;background:#2c313a}
+.seg.on{background:#3ecf8e}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:4px 0}
+.meter>div{height:100%;border-radius:4px}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.task-full{white-space:pre-wrap;background:#12151a;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;max-height:320px;overflow-y:auto;font-size:14px}
+.auth{padding:16px 14px}
+.auth button{padding:12px 18px;margin-top:10px}
+
+/* ---- header menu ---- */
+.menu-wrap{position:relative}
+.menu-btn{width:46px;height:46px;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:12px;padding:0;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu-btn:active{background:#2c313a}
+.menu-btn[aria-expanded="true"]{background:#2c313a;border-color:#3ecf8e}
+.menu-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:208px;background:#1a1d23;border:1px solid #2c313a;border-radius:16px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:30}
+.menu-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9aa3ad;padding:10px 12px 6px}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;background:transparent;color:#e6e6e6;border:0;border-radius:10px;padding:12px 12px;font:inherit;font-size:15px;text-align:left;cursor:pointer}
+.menu-item:active{background:#2c313a}
+.menu-item.active{background:#3ecf8e;color:#08130d;font-weight:700}
+.menu-item.danger{color:#ff7b72}
+.menu-sep{height:1px;background:#2c313a;margin:6px 6px}
+
+.previewbar{background:#12151a;border-bottom:1px solid #2c313a;color:#9aa3ad;font-size:11.5px;text-align:center;padding:5px 10px}
+</style></head><body>
+<div class="previewbar">Preview build — header menu feature · synthetic demo data, no live backend</div>
+<div id="root"></div>
+<script>
+(function(){
+"use strict";
+const h = (tag, opts, ...kids) => {
+  const e = document.createElement(tag);
+  opts = opts || {};
+  for (const k in opts) {
+    if (k === 'class') e.className = opts[k];
+    else if (k === 'text') e.textContent = opts[k];
+    else if (k === 'html') e.innerHTML = opts[k];
+    else if (k === 'style') Object.assign(e.style, opts[k]);
+    else if (k.startsWith('on') && typeof opts[k] === 'function') e.addEventListener(k.slice(2), opts[k]);
+    else if (opts[k] !== undefined && opts[k] !== null && opts[k] !== false) e.setAttribute(k, opts[k] === true ? '' : opts[k]);
+  }
+  const append = (kid) => {
+    if (kid === null || kid === undefined || kid === false) return;
+    if (Array.isArray(kid)) { kid.forEach(append); return; }
+    e.appendChild(kid.nodeType ? kid : document.createTextNode(kid));
+  };
+  kids.forEach(append);
+  return e;
+};
+
+// ===== synthetic fixtures (no network, no auth) =====
+const NOW = Date.now();
+const MIN = 60000, DAY = 86400000;
+
+let MESSAGES = [
+  {role:'assistant', content:"Hi, I'm Alleah. Tell me things and I'll remember them for later — projects, preferences, people, whatever's useful."},
+  {role:'user', content:"I'm training for a 10K in three weeks, long runs on Saturdays."},
+  {role:'assistant', content:"Got it — logged the race timeline and your Saturday long-run habit. I'll bring it up if you ask about training or scheduling.", folders:[{n:1,title:'Fitness goals'}]},
+  {role:'user', content:"Also remind me my sister's birthday is the 14th next month."},
+  {role:'assistant', content:"Noted — sister's birthday on the 14th. Want me to nudge you a few days ahead when it gets close?", folders:[{n:2,title:'Family & dates'}]},
+];
+
+const REPLIES = [
+  "Logged that. I'll fold it into whatever we're working on next.",
+  "Got it — filed under memory, I'll surface it again when it's relevant.",
+  "Noted. Anything else you want me to keep track of?",
+  "Understood, I've got that saved.",
+];
+
+const TASKS = [
+  {
+    id:'t1', kind:'build', status:'running', instruction:'Build a compact weekly training log view with a mileage chart and a notes field per run.',
+    steps_used:22, spend_usd:0.86, created_at: NOW - 6*MIN, progress:'writing the mileage chart component…',
+  },
+  {
+    id:'t2', kind:'build', status:'done', instruction:'Add a header menu with Chat/Tasks links plus New chat and Sign out actions, mobile-first sizing.',
+    steps_used:31, spend_usd:1.14, created_at: NOW - 3*DAY, completed_at: NOW - 3*DAY + 26*MIN,
+    preview:{status:'ready', revision:2, preview_url:'https://example-preview.pages.dev/header-menu'},
+    review:'audited staged commit: 9f2c7ab1230e4d1abc9\nverdict: clean\nfindings: none',
+  },
+  {
+    id:'t3', kind:'research', status:'capped', instruction:'Summarize the tradeoffs between polling and websockets for the tasks tray refresh.',
+    steps_used:25, spend_usd:0.50, created_at: NOW - 1*DAY - 4*60*MIN, completed_at: NOW - 1*DAY - 3*60*MIN,
+    result:'Hit the research budget cap before finishing the comparison. Partial notes: polling is simpler and fits the current 5s interval; websockets would cut latency but add a persistent-connection dependency that this stack doesn\\'t have yet.',
+  },
+  {
+    id:'t4', kind:'revision', status:'failed', instruction:'Tighten the spend meter thresholds so amber kicks in earlier.',
+    steps_used:9, spend_usd:0.22, created_at: NOW - 5*DAY, completed_at: NOW - 5*DAY + 4*MIN,
+    error:'Task failed: could not locate the target constant to modify (renamed since last build).',
+  },
+  {
+    id:'t5', kind:'build', status:'cancelled', instruction:'Prototype a calendar heatmap for goal streaks.',
+    steps_used:4, spend_usd:0.06, created_at: NOW - 9*DAY, completed_at: NOW - 9*DAY + 2*MIN,
+  },
+];
+
+const STATUS_COLOR = {queued:'#9aa3ad', running:'#3ecf8e', done:'#3ecf8e', capped:'#e0a458', failed:'#ff7b72', cancelled:'#5c636e'};
+
+function fmtAge(ms) {
+  const m = Math.floor((NOW - ms) / MIN);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.floor(m/60) + 'h ago';
+  return Math.floor(m/1440) + 'd ago';
+}
+
+// ===== app state =====
+const state = {
+  signedIn: true,
+  view: 'chat',
+  menuOpen: false,
+  messages: MESSAGES.slice(),
+  text: '',
+  busy: false,
+  openTasks: {},
+};
+
+const root = document.getElementById('root');
+
+function setState(patch) { Object.assign(state, patch); render(); }
+
+// ===== header menu (the feature under preview) =====
+// Single source of truth for the view links in the header menu. Add another
+// {key,label} here later to introduce a new tab - the highlight logic already
+// keys off this list, no other wiring needed.
+const VIEWS = [
+  {key:'chat', label:'Chat'},
+  {key:'tasks', label:'Tasks'},
+];
+
+function renderHeaderMenu() {
+  const wrap = h('div', {class:'menu-wrap'});
+  const btn = h('button', {
+    type:'button', class:'menu-btn', 'aria-haspopup':'menu', 'aria-expanded': state.menuOpen ? 'true' : 'false',
+    'aria-label': state.menuOpen ? 'Close menu' : 'Open menu',
+    onclick: (e) => { e.stopPropagation(); setState({menuOpen: !state.menuOpen}); },
+  }, '☰');
+  wrap.appendChild(btn);
+  if (state.menuOpen) {
+    const dd = h('div', {class:'menu-dropdown', role:'menu'});
+    dd.appendChild(h('div', {class:'menu-label'}, 'View'));
+    VIEWS.forEach(v => {
+      dd.appendChild(h('button', {
+        type:'button', role:'menuitem',
+        class:'menu-item' + (state.view === v.key ? ' active' : ''),
+        'aria-current': state.view === v.key ? 'page' : undefined,
+        onclick: (e) => { e.stopPropagation(); setState({view: v.key, menuOpen:false}); },
+      }, v.label));
+    });
+    dd.appendChild(h('div', {class:'menu-sep'}));
+    dd.appendChild(h('button', {
+      type:'button', role:'menuitem', class:'menu-item',
+      onclick: (e) => {
+        e.stopPropagation();
+        if (confirm('Clear this conversation? (Your memory folders are not affected.)')) {
+          setState({messages:[], menuOpen:false});
+        } else {
+          setState({menuOpen:false});
+        }
+      },
+    }, 'New chat'));
+    dd.appendChild(h('button', {
+      type:'button', role:'menuitem', class:'menu-item danger',
+      onclick: (e) => { e.stopPropagation(); setState({menuOpen:false, signedIn:false}); },
+    }, 'Sign out'));
+    wrap.appendChild(dd);
+  }
+  return wrap;
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (state.menuOpen && !e.target.closest('.menu-wrap')) setState({menuOpen:false});
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && state.menuOpen) setState({menuOpen:false});
+});
+
+// ===== views =====
+function renderAuth() {
+  return h('div', {class:'auth'},
+    h('h1', null, 'Alleah'),
+    h('div', {style:{height:'12px'}}),
+    h('p', {class:'muted'}, 'Signed out (preview). No real account system in this build.'),
+    h('div', {class:'row', style:{display:'flex', gap:'8px', marginTop:'10px'}},
+      h('button', {onclick: () => setState({signedIn:true, view:'chat'})}, 'Sign back in')));
+}
+
+function renderChat() {
+  const frag = document.createDocumentFragment();
+  const thread = h('div', {id:'thread'});
+  if (state.messages.length === 0) {
+    thread.appendChild(h('p', {class:'muted', style:{padding:'0 6px'}}, 'Talk to me. What you tell me about what you know gets remembered - automatically.'));
+  }
+  state.messages.forEach(m => {
+    thread.appendChild(h('div', {class:'msg ' + m.role}, m.content));
+    if (m.folders && m.folders.length) {
+      thread.appendChild(h('div', {class:'cites'}, 'memory: ' + m.folders.map(f => '[' + f.n + '] ' + f.title).join('  ')));
+    }
+  });
+  if (state.busy) thread.appendChild(h('div', {class:'typing'}, 'thinking...'));
+  const endMarker = h('div');
+  thread.appendChild(endMarker);
+  frag.appendChild(thread);
+
+  let sendBtn;
+  const textarea = h('textarea', {
+    placeholder:'Message Alleah...', rows:1,
+    oninput: (e) => { state.text = e.target.value; if (sendBtn) sendBtn.disabled = state.busy || !state.text.trim(); },
+    onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } },
+  });
+  textarea.value = state.text;
+  sendBtn = h('button', {disabled: state.busy || !state.text.trim(), onclick: send}, 'Send');
+  frag.appendChild(h('div', {class:'composer'}, textarea, sendBtn));
+
+  requestAnimationFrame(() => { endMarker.scrollIntoView({behavior:'smooth'}); textarea.focus(); });
+  return frag;
+
+  function send() {
+    const content = state.text.trim();
+    if (!content || state.busy) return;
+    state.messages = state.messages.concat([{role:'user', content}]);
+    state.text = '';
+    state.busy = true;
+    render();
+    setTimeout(() => {
+      const reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
+      state.messages = state.messages.concat([{role:'assistant', content: reply}]);
+      state.busy = false;
+      render();
+    }, 700);
+  }
+}
+
+function renderTaskCard(t) {
+  const active = t.status === 'queued' || t.status === 'running';
+  const CAP = (t.kind === 'build' || t.kind === 'revision') ? {steps:50, spend:2.00, min:30} : {steps:25, spend:0.50, min:15};
+  const steps = Math.min(t.steps_used || 0, CAP.steps);
+  const spend = Math.min(Number(t.spend_usd) || 0, CAP.spend);
+  const spendRatio = spend / CAP.spend;
+  const endMs = t.completed_at || NOW;
+  const elapsedMs = Math.max(0, Math.min(endMs - t.created_at, CAP.min * MIN));
+  const elapsed = Math.floor(elapsedMs/MIN) + 'm ' + Math.floor((elapsedMs%MIN)/1000) + 's';
+  const spendColor = spendRatio < 0.5 ? '#3ecf8e' : spendRatio < 0.8 ? '#e0a458' : '#ff7b72';
+  const color = STATUS_COLOR[t.status] || '#9aa3ad';
+  const open = !!state.openTasks[t.id];
+  const pv = t.preview;
+  const rvw = t.review;
+  const sha = rvw ? (/audited staged commit: ([0-9a-f]{7,40})/i.exec(rvw) || [])[1] : null;
+  const saysClean = rvw ? /verdict:\s*clean|findings:\s*(none|0)/i.test(rvw) : false;
+  const clean = !!sha && saysClean;
+
+  const label = t.kind === 'review' ? 'audit of build ' + (t.instruction || '').trim().slice(0,8) : (t.instruction || '');
+  const shownLabel = open ? label : (label.length > 110 ? label.slice(0,110) + '...' : label);
+
+  const card = h('div', {class:'card'});
+  const top = h('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px'}},
+    h('span', {class:'badge'},
+      h('span', {class:'dot' + (t.status==='running' ? ' pulse' : ''), style:{background:color}}),
+      h('span', {style:{color:color}}, (t.kind && t.kind !== 'research' ? t.kind + ' · ' : '') + t.status)),
+    h('span', {class:'small'}, fmtAge(t.created_at)));
+  if (active) {
+    top.appendChild(h('button', {class:'secondary', style:{marginTop:'0', padding:'4px 10px', fontSize:'12px'},
+      onclick: () => alert('Preview only — cancelling is disabled in this demo.')}, 'Cancel'));
+  }
+  card.appendChild(top);
+
+  if (pv) {
+    const safeUrl = /^https:\/\//.test(pv.preview_url || '');
+    const line = h('p', {class:'small', style:{margin:'6px 0 0'}});
+    line.appendChild(safeUrl ? h('a', {href:pv.preview_url, target:'_blank', rel:'noopener', style:{color:'#3ecf8e'}}, 'Preview ↗') : h('span', {style:{color:'#9aa3ad'}}, 'preview url missing'));
+    line.appendChild(document.createTextNode('  rev ' + pv.revision + ' · ' + pv.status));
+    if (rvw) {
+      line.appendChild(clean
+        ? h('span', {style:{color:'#3ecf8e'}}, '  ·  review: clean ✓  sha ' + sha.slice(0,12) + '…')
+        : h('span', {style:{color:'#9aa3ad'}}, '  ·  review done - ask Alleah for the verdict'));
+    }
+    card.appendChild(line);
+  }
+
+  card.appendChild(h('p', {style:{margin:'8px 0 4px', cursor:'pointer'}, onclick: () => { state.openTasks[t.id] = !open; render(); }}, shownLabel));
+
+  if (t.status === 'running' && t.progress) card.appendChild(h('p', {class:'small', style:{color:'#e6e6e6'}}, '▸ ' + t.progress));
+
+  if (active) {
+    const seg = h('div', {class:'segbar'});
+    for (let i=0;i<CAP.steps;i++) seg.appendChild(h('span', {class:'seg' + (i < steps ? ' on' : '')}));
+    card.appendChild(h('div', {class:'small'}, 'steps used: ' + steps + ' / ' + CAP.steps));
+    card.appendChild(seg);
+    card.appendChild(h('div', {class:'small'}, 'spend: $' + spend.toFixed(2) + ' / $' + CAP.spend.toFixed(2) + ' cap'));
+    card.appendChild(h('div', {class:'meter'}, h('div', {style:{width:(spendRatio*100)+'%', background:spendColor}})));
+    card.appendChild(h('div', {class:'small'}, 'time since queued: ' + elapsed + ' / ' + CAP.min + 'm limit'));
+    card.appendChild(h('div', {class:'meter'}, h('div', {style:{width:(elapsedMs/(CAP.min*MIN)*100)+'%', background:'#3ecf8e'}})));
+  }
+
+  if (open) {
+    if (t.result) card.appendChild(h('div', {class:'task-full'}, t.result));
+    if (t.error) card.appendChild(h('p', {class:'err', style:{padding:0}}, t.error));
+    card.appendChild(h('p', {class:'small'}, 'steps ' + (t.steps_used||0) + ' · $' + (Number(t.spend_usd)||0).toFixed(2) +
+      ' · queued ' + new Date(t.created_at).toLocaleString() +
+      (t.completed_at ? ' · finished ' + new Date(t.completed_at).toLocaleString() : '')));
+  }
+  return card;
+}
+
+function renderTasks() {
+  const wrap = h('div', {id:'tasks'});
+  TASKS.forEach(t => wrap.appendChild(renderTaskCard(t)));
+  return wrap;
+}
+
+// ===== root render =====
+function render() {
+  root.innerHTML = '';
+  if (!state.signedIn) { root.appendChild(renderAuth()); return; }
+
+  const header = h('header', null,
+    h('h1', null, 'Alleah'),
+    renderHeaderMenu());
+  root.appendChild(header);
+
+  if (state.view === 'tasks') root.appendChild(renderTasks());
+  else root.appendChild(renderChat());
+}
+
+render();
+})();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="17a0a322-r0-1785366220">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "17a0a322-a845-4ac2-9ac7-cf96c7b0731f", "revision": 0, "deploy_marker": "17a0a322-r0-1785366220", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
