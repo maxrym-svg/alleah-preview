@@ -2,322 +2,336 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Alleah · Goals</title>
+<title>Alleah — Goals</title>
 <meta name="theme-color" content="#0f1115">
 <style>
 :root{color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
-#root{min-height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
 header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:8px}
-h1{font-size:18px;margin:0}
-.navrow{display:flex;gap:6px}
+h1{font-size:18px;margin:0;flex-shrink:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
-button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:7px 13px;border-radius:8px}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;border-radius:8px}
 button.secondary.active{background:#3ecf8e;color:#08130d}
 button:disabled{opacity:.5}
 .muted{color:#9aa3ad;font-size:14px}
-#view{flex:1;overflow-y:auto;padding:8px 14px 24px}
-.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:14px 16px;margin:10px 0}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
 .dot{width:8px;height:8px;border-radius:50%}
-.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:6px 0}
-.meter>div{height:100%;border-radius:4px;background:#3ecf8e;transition:width .35s ease}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:4px 0}
+.meter>div{height:100%;border-radius:4px}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
 .small{font-size:12px;color:#9aa3ad;margin:2px 0}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:#3ecf8e;color:#08130d;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:#1a1d23;border:1px solid #2c313a;border-bottom-left-radius:4px}
+.composer{display:flex;gap:8px;padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+textarea{flex:1;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:120px}
+#tasks{flex:1;overflow-y:auto;padding:8px 14px}
+#goals{flex:1;overflow-y:auto;padding:8px 14px 24px}
 .summary-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.summary-num{font-size:26px;font-weight:700;color:#e6e6e6}
-.summary-grid{display:flex;gap:18px;margin-top:10px}
-.summary-stat{flex:1}
-.summary-stat .n{font-size:20px;font-weight:700}
-.summary-stat .l{font-size:11px;color:#9aa3ad;text-transform:uppercase;letter-spacing:.04em}
+.summary-num{font-size:20px;font-weight:700;color:#3ecf8e}
+.summary-grid{display:flex;gap:10px;margin-top:8px}
+.summary-stat{flex:1;text-align:center;background:#0f1115;border:1px solid #2c313a;border-radius:8px;padding:8px 4px}
+.summary-stat .n{font-size:16px;font-weight:700}
+.summary-stat .l{font-size:10.5px;color:#9aa3ad;margin-top:2px}
 .filter-bar{display:flex;gap:6px;margin:14px 0 4px}
-.goal-card{background:#12151a;border:1px solid #2c313a;border-radius:12px;margin:10px 0;overflow:hidden}
-.goal-head{padding:13px 15px;display:flex;flex-direction:column;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.goal-toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.goal-title{font-weight:600;font-size:15px;line-height:1.35}
-.goal-desc{font-size:12.5px;color:#9aa3ad;margin-top:1px}
-.chev{flex-shrink:0;color:#9aa3ad;transition:transform .2s ease;margin-top:2px}
-.goal-card.open .chev{transform:rotate(90deg)}
-.progress-row{display:flex;align-items:center;gap:8px;margin-top:2px}
-.progress-row .meter{flex:1;margin:0}
-.progress-row .frac{font-size:12px;color:#9aa3ad;white-space:nowrap}
-.steps{max-height:0;overflow:hidden;transition:max-height .25s ease;border-top:1px solid #2c313a}
-.goal-card.open .steps{max-height:600px}
-.steps-inner{padding:6px 15px 12px}
-.step-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #1c2027}
+/* ===== Goals map: scavenger-hunt style trail, easiest goal at the top,
+   hardest at the bottom, alternating left/right down a dashed spine. ===== */
+.map-wrap{position:relative;padding:34px 0 6px}
+.map-wrap::before{content:'';position:absolute;left:50%;top:2px;bottom:2px;width:2px;
+  background:repeating-linear-gradient(to bottom,#2c313a 0 6px,transparent 6px 13px);
+  transform:translateX(-50%);z-index:0}
+.map-row{position:relative;display:flex;margin:0 0 40px;z-index:1}
+.map-row:last-child{margin-bottom:4px}
+.map-row.mleft{justify-content:flex-start}
+.map-row.mright{justify-content:flex-end}
+.map-node{width:47%;position:relative;z-index:2}
+.map-stem{position:absolute;top:22px;height:2px;background:#2c313a;z-index:1}
+.map-row.mleft .map-stem{left:47%;width:3%}
+.map-row.mright .map-stem{right:47%;width:3%}
+.map-dot{position:absolute;top:13px;left:50%;transform:translateX(-50%);width:18px;height:18px;
+  border-radius:50%;border:3px solid #0f1115;z-index:3;font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;color:#08130d}
+.map-tag{position:absolute;top:-15px;font-size:9.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;white-space:nowrap}
+.map-row.mleft .map-tag{left:2px}
+.map-row.mright .map-tag{right:2px}
+.goal-card{background:#12151a;border:1px solid #2c313a;border-radius:11px;overflow:hidden}
+.goal-head{padding:10px 12px;display:flex;flex-direction:column;gap:5px;cursor:pointer}
+.goal-toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.goal-title{font-weight:600;font-size:13.5px;line-height:1.3}
+.goal-desc{font-size:11.5px;color:#9aa3ad;margin-top:1px}
+.chev{flex-shrink:0;color:#9aa3ad;transition:transform .2s ease;margin-top:1px;display:inline-block;font-size:12px}
+.chev.open{transform:rotate(90deg)}
+.progress-row{display:flex;align-items:center;gap:7px;margin-top:1px}
+.progress-row .meter{flex:1;margin:0;height:6px}
+.progress-row .frac{font-size:11px;color:#9aa3ad;white-space:nowrap}
+.steps-inner{padding:4px 12px 10px;border-top:1px solid #2c313a}
+.step-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #1c2027;cursor:pointer}
 .step-row:last-child{border-bottom:none}
-.step-row input[type=checkbox]{width:19px;height:19px;accent-color:#3ecf8e;flex-shrink:0;cursor:pointer}
-.step-title{font-size:14px}
+.step-row input[type=checkbox]{width:18px;height:18px;accent-color:#3ecf8e;flex-shrink:0;cursor:pointer}
+.step-title{font-size:13px}
 .step-title.done{color:#6f7580;text-decoration:line-through}
-.step-meta{margin-left:auto;font-size:11px;color:#5c636e;white-space:nowrap}
+.step-meta{margin-left:auto;font-size:10.5px;color:#5c636e;white-space:nowrap}
 .status-active{color:#3ecf8e}
 .status-completed{color:#9aa3ad}
-.empty{padding:30px 6px;text-align:center}
-footer.note{padding:10px 14px calc(10px + env(safe-area-inset-bottom));font-size:11px;color:#5c636e;text-align:center}
+.note{font-size:11px;color:#5c636e;padding:2px 6px 0}
 </style></head><body>
 <div id="root"></div>
 <script>
 (function(){
-  "use strict";
+'use strict';
+const h = (tag, attrs) => { let s = '<' + tag; attrs = attrs || {}; for (const k in attrs) s += ' ' + k + '="' + attrs[k] + '"'; return s; };
 
-  // ---- synthetic fixture data (no network, no backend) ----
-  var STORAGE_KEY = "alleah_goals_preview_v1";
-  var seedGoals = [
-    {
-      id: "g1", title: "Launch personal website", status: "active",
-      description: "Portfolio site with blog and project showcase.",
-      steps: [
-        {id:"g1s1", title:"Buy domain and hosting", completed:true},
-        {id:"g1s2", title:"Design homepage wireframe", completed:true},
-        {id:"g1s3", title:"Build homepage in code", completed:false},
-        {id:"g1s4", title:"Write 3 launch blog posts", completed:false},
-        {id:"g1s5", title:"Set up analytics", completed:false}
-      ]
-    },
-    {
-      id: "g2", title: "Run a half marathon", status: "active",
-      description: "First half marathon this fall.",
-      steps: [
-        {id:"g2s1", title:"Buy proper running shoes", completed:true},
-        {id:"g2s2", title:"Build base mileage (15 mi/wk)", completed:true},
-        {id:"g2s3", title:"Complete a 10-mile long run", completed:true},
-        {id:"g2s4", title:"Register for the race", completed:false},
-        {id:"g2s5", title:"Taper week", completed:false},
-        {id:"g2s6", title:"Race day", completed:false}
-      ]
-    },
-    {
-      id: "g3", title: "Learn conversational Spanish", status: "active",
-      description: "Enough Spanish for a trip in December.",
-      steps: [
-        {id:"g3s1", title:"Finish beginner course", completed:true},
-        {id:"g3s2", title:"Practice 15 min/day for 30 days", completed:false},
-        {id:"g3s3", title:"Have a 10-min chat with a tutor", completed:false},
-        {id:"g3s4", title:"Watch a movie without subtitles", completed:false}
-      ]
-    },
-    {
-      id: "g4", title: "Build a $5,000 emergency fund", status: "active",
-      description: "Three months of essential expenses saved.",
-      steps: [
-        {id:"g4s1", title:"Open high-yield savings account", completed:true},
-        {id:"g4s2", title:"Automate $250/mo transfer", completed:true},
-        {id:"g4s3", title:"Reach $2,500", completed:true},
-        {id:"g4s4", title:"Reach $5,000", completed:false}
-      ]
-    },
-    {
-      id: "g5", title: "Read 12 books this year", status: "completed",
-      description: "One book a month, mixing fiction and nonfiction.",
-      steps: (function(){
-        var arr = [];
-        for (var i=1;i<=12;i++) arr.push({id:"g5s"+i, title:"Book "+i+" finished", completed:true});
-        return arr;
-      })()
-    }
+// ===== Synthetic, self-contained demo fixtures (no network calls) =====
+const now = Date.now();
+const hrsAgo = (n) => new Date(now - n*3600000).toISOString();
+const daysAgo = (n) => new Date(now - n*86400000).toISOString();
+
+let GOALS = [
+  {id:'g1', title:'Drink 8 glasses of water daily', description:'Small daily habit to build hydration consistency.', status:'active', difficulty:1, created_at: daysAgo(30)},
+  {id:'g2', title:'Read 12 books this year', description:'One a month, mixing fiction and non-fiction.', status:'active', difficulty:1, created_at: daysAgo(25)},
+  {id:'g3', title:'Tidy the home office', description:'One clean, calm space to actually work in.', status:'completed', difficulty:1, created_at: daysAgo(60)},
+  {id:'g4', title:'Hold a conversation in Spanish', description:'Enough to order food and chat with a stranger.', status:'active', difficulty:2, created_at: daysAgo(20)},
+  {id:'g5', title:'Run a half marathon', description:'13.1 miles, on my own two feet, by autumn.', status:'active', difficulty:3, created_at: daysAgo(14)},
+  {id:'g6', title:'Launch a small side business', description:'Ship something people can actually pay for.', status:'active', difficulty:3, created_at: daysAgo(9)},
+  {id:'g7', title:'Write and publish a novel', description:'50,000 words, start to finished draft.', status:'active', difficulty:4, created_at: daysAgo(3)},
+];
+
+let STEPS = [
+  {id:'s1', goal_id:'g1', position:1, title:'Buy a marked water bottle', completed:true, completed_at: daysAgo(29)},
+  {id:'s2', goal_id:'g1', position:2, title:'Set 3 daily reminders', completed:true, completed_at: daysAgo(27)},
+  {id:'s3', goal_id:'g1', position:3, title:'Track for 2 full weeks', completed:false, completed_at:null},
+
+  {id:'s4', goal_id:'g2', position:1, title:'Pick the first 3 books', completed:true, completed_at: daysAgo(24)},
+  {id:'s5', goal_id:'g2', position:2, title:'Finish book one', completed:true, completed_at: daysAgo(18)},
+  {id:'s6', goal_id:'g2', position:3, title:'Finish book two', completed:false, completed_at:null},
+  {id:'s7', goal_id:'g2', position:4, title:'Finish book three', completed:false, completed_at:null},
+
+  {id:'s8', goal_id:'g3', position:1, title:'Clear the desk', completed:true, completed_at: daysAgo(58)},
+  {id:'s9', goal_id:'g3', position:2, title:'Sort the cable drawer', completed:true, completed_at: daysAgo(56)},
+  {id:'s10', goal_id:'g3', position:3, title:'Donate the old chair', completed:true, completed_at: daysAgo(55)},
+
+  {id:'s11', goal_id:'g4', position:1, title:'Learn the present tense basics', completed:true, completed_at: daysAgo(19)},
+  {id:'s12', goal_id:'g4', position:2, title:'Learn 200 core vocab words', completed:true, completed_at: daysAgo(12)},
+  {id:'s13', goal_id:'g4', position:3, title:'Complete 10 speaking lessons', completed:false, completed_at:null},
+  {id:'s14', goal_id:'g4', position:4, title:'Have a 5-minute chat with a tutor', completed:false, completed_at:null},
+  {id:'s15', goal_id:'g4', position:5, title:'Order a full meal in Spanish', completed:false, completed_at:null},
+
+  {id:'s16', goal_id:'g5', position:1, title:'Run a 5k without stopping', completed:true, completed_at: daysAgo(10)},
+  {id:'s17', goal_id:'g5', position:2, title:'Run a 10k', completed:false, completed_at:null},
+  {id:'s18', goal_id:'g5', position:3, title:'Build up to 15 miles/week', completed:false, completed_at:null},
+  {id:'s19', goal_id:'g5', position:4, title:'Run a half-distance training run', completed:false, completed_at:null},
+  {id:'s20', goal_id:'g5', position:5, title:'Race day', completed:false, completed_at:null},
+
+  {id:'s21', goal_id:'g6', position:1, title:'Validate the idea with 10 people', completed:false, completed_at:null},
+  {id:'s22', goal_id:'g6', position:2, title:'Build a minimum viable product', completed:false, completed_at:null},
+  {id:'s23', goal_id:'g6', position:3, title:'Set up payments', completed:false, completed_at:null},
+  {id:'s24', goal_id:'g6', position:4, title:'Get the first paying customer', completed:false, completed_at:null},
+  {id:'s25', goal_id:'g6', position:5, title:'Reach 10 paying customers', completed:false, completed_at:null},
+  {id:'s26', goal_id:'g6', position:6, title:'Take a full week off and it keeps running', completed:false, completed_at:null},
+
+  {id:'s27', goal_id:'g7', position:1, title:'Outline the plot', completed:false, completed_at:null},
+  {id:'s28', goal_id:'g7', position:2, title:'Write the first 10,000 words', completed:false, completed_at:null},
+  {id:'s29', goal_id:'g7', position:3, title:'Reach the halfway point', completed:false, completed_at:null},
+  {id:'s30', goal_id:'g7', position:4, title:'Finish the first draft', completed:false, completed_at:null},
+  {id:'s31', goal_id:'g7', position:5, title:'Revise with beta readers', completed:false, completed_at:null},
+  {id:'s32', goal_id:'g7', position:6, title:'Publish', completed:false, completed_at:null},
+];
+
+const MESSAGES = [
+  {role:'assistant', content:"Talk to me. What you tell me about what you know gets remembered - automatically."},
+  {role:'user', content:'Remind me what I said about training for the half marathon.'},
+  {role:'assistant', content:"You're building up mileage gradually and just finished your first 5k without stopping. Race day is the goal — I've got it tracked in Goals."},
+];
+
+const TASKS = [
+  {id:'t1', kind:'build', status:'done', instruction:'Add a Goals tab with expandable step checklists', created_at: hrsAgo(5), completed_at: hrsAgo(4), steps_used: 31, spend_usd: 1.42},
+  {id:'t2', kind:'research', status:'done', instruction:'Summarize best practices for habit-tracking UI', created_at: hrsAgo(26), completed_at: hrsAgo(25), steps_used: 9, spend_usd: 0.11},
+];
+
+function diffMeta(n) {
+  const DIFF = [
+    {label:'Warm-up',     color:'#3ecf8e'},
+    {label:'Steady',      color:'#5ec9e0'},
+    {label:'Challenging', color:'#e0a458'},
+    {label:'Expedition',  color:'#ff7b72'},
   ];
+  const i = Math.min(Math.max((n|0) - 1, 0), DIFF.length - 1);
+  return DIFF[i];
+}
+function stepFraction(steps) {
+  const total = steps.length;
+  const done = steps.filter(s => s.completed).length;
+  return {total, done, pct: total ? Math.round(done/total*100) : 0};
+}
+function fmtAge(iso) {
+  const m = Math.floor((now - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.floor(m/60) + 'h ago';
+  return Math.floor(m/1440) + 'd ago';
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-  function loadState() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return clone(seedGoals);
-      var saved = JSON.parse(raw);
-      // merge saved completion flags onto the seed shape so structure edits here still apply
-      return seedGoals.map(function(g){
-        var sg = saved.find(function(x){ return x.id === g.id; });
-        return {
-          id: g.id, title: g.title, description: g.description,
-          status: g.status,
-          steps: g.steps.map(function(s){
-            var ss = sg && sg.steps ? sg.steps.find(function(x){ return x.id === s.id; }) : null;
-            return { id: s.id, title: s.title, completed: ss ? !!ss.completed : s.completed };
-          })
-        };
-      });
-    } catch (e) { return clone(seedGoals); }
-  }
-  function clone(x){ return JSON.parse(JSON.stringify(x)); }
-  function saveState(goals) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
-  }
-  function recomputeStatus(goal) {
-    // mirrors the real app's DB trigger: all steps done -> completed, otherwise active
-    // (archived goals aren't part of this fixture set, so we don't need to preserve one here)
-    var total = goal.steps.length;
-    var done = goal.steps.filter(function(s){ return s.completed; }).length;
-    if (total > 0 && done === total) goal.status = "completed";
-    else if (goal.status === "completed") goal.status = "active";
-  }
+// ===== app state =====
+const state = { view: 'goals', filter: 'active', open: {} };
 
-  var state = {
-    goals: loadState(),
-    open: {},        // goalId -> bool
-    filter: "active", // 'active' | 'all'
-    view: "goals"     // 'chat' | 'tasks' | 'goals'
-  };
+function render() {
+  const root = document.getElementById('root');
+  root.innerHTML =
+    h('header') +
+      '<h1>Alleah</h1>' +
+      h('div', {class:'tabs'}) +
+        h('button', {class:'secondary' + (state.view==='chat'?' active':''), onclick:'App.setView("chat")'}) + 'Chat</button>' +
+        h('button', {class:'secondary' + (state.view==='tasks'?' active':''), onclick:'App.setView("tasks")'}) + 'Tasks</button>' +
+        h('button', {class:'secondary' + (state.view==='goals'?' active':''), onclick:'App.setView("goals")'}) + 'Goals</button>' +
+      '</div>' +
+    '</header>' +
+    (state.view === 'chat' ? renderChat() : state.view === 'tasks' ? renderTasks() : renderGoals());
+}
 
-  var root = document.getElementById("root");
+function renderChat() {
+  let out = h('div', {id:'thread'});
+  MESSAGES.forEach(m => { out += h('div', {class:'msg ' + m.role}) + esc(m.content) + '</div>'; });
+  out += '</div>';
+  out += h('div', {class:'composer'}) +
+    h('textarea', {placeholder:'Message Alleah...', rows:1, disabled:'disabled'}) + '</textarea>' +
+    h('button', {disabled:'disabled'}) + 'Send</button>' +
+  '</div>';
+  out += '<p class="note" style="padding:0 14px">Demo preview — chat is static, read-only.</p>';
+  return out;
+}
 
-  function h(tag, attrs) {
-    var el = document.createElement(tag);
-    attrs = attrs || {};
-    Object.keys(attrs).forEach(function(k){
-      if (k === "class") el.className = attrs[k];
-      else if (k === "text") el.textContent = attrs[k];
-      else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), attrs[k]);
-      else el.setAttribute(k, attrs[k]);
-    });
-    for (var i = 2; i < arguments.length; i++) {
-      var child = arguments[i];
-      if (child == null) continue;
-      if (Array.isArray(child)) child.forEach(function(c){ if (c) el.appendChild(c); });
-      else if (typeof child === "string") el.appendChild(document.createTextNode(child));
-      else el.appendChild(child);
+function renderTasks() {
+  let out = h('div', {id:'tasks'});
+  TASKS.forEach(t => {
+    out += h('div', {class:'card'}) +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+        h('span', {class:'badge'}) +
+          h('span', {class:'dot', style:'background:#3ecf8e'}) + '</span>' +
+          '<span style="color:#3ecf8e">' + t.kind + ' · ' + t.status + '</span>' +
+        '</span>' +
+        '<span class="small">' + fmtAge(t.created_at) + '</span>' +
+      '</div>' +
+      '<p style="margin:8px 0 4px">' + esc(t.instruction) + '</p>' +
+      '<p class="small">steps ' + t.steps_used + ' · $' + t.spend_usd.toFixed(2) + '</p>' +
+    '</div>';
+  });
+  return out + '</div>';
+}
+
+function renderGoals() {
+  const stepsByGoal = {};
+  STEPS.forEach(s => { (stepsByGoal[s.goal_id] = stepsByGoal[s.goal_id] || []).push(s); });
+  const activeGoals = GOALS.filter(g => g.status === 'active');
+  const visible = GOALS.filter(g => state.filter === 'all' ? true : g.status === 'active');
+  const trail = visible.slice().sort((a, b) =>
+    (a.difficulty||1) - (b.difficulty||1) || new Date(a.created_at) - new Date(b.created_at));
+  const activeFrac = stepFraction(activeGoals.flatMap(g => stepsByGoal[g.id] || []));
+  const completedCount = GOALS.filter(g => g.status === 'completed').length;
+
+  let out = h('div', {id:'goals'});
+
+  out += h('div', {class:'card'}) +
+    '<div class="summary-top">' +
+      '<div><span class="summary-num">' + activeGoals.length + '</span> ' +
+        '<span class="muted">' + (activeGoals.length === 1 ? 'active goal' : 'active goals') + '</span></div>' +
+      '<span class="small">' + activeFrac.pct + '% of active steps done</span>' +
+    '</div>' +
+    h('div', {class:'meter'}) + h('div', {style:'width:'+activeFrac.pct+'%;background:#3ecf8e'}) + '</div></div>' +
+    '<div class="summary-grid">' +
+      '<div class="summary-stat"><div class="n">' + activeFrac.done + '</div><div class="l">steps done</div></div>' +
+      '<div class="summary-stat"><div class="n">' + (activeFrac.total - activeFrac.done) + '</div><div class="l">steps left</div></div>' +
+      '<div class="summary-stat"><div class="n">' + completedCount + '</div><div class="l">completed goals</div></div>' +
+    '</div>' +
+  '</div>';
+
+  out += '<div class="filter-bar">' +
+    h('button', {class:'secondary' + (state.filter==='active'?' active':''), onclick:'App.setFilter("active")'}) + 'Active</button>' +
+    h('button', {class:'secondary' + (state.filter==='all'?' active':''), onclick:'App.setFilter("all")'}) + 'All</button>' +
+  '</div>';
+
+  out += '<p class="note">Map runs easiest → hardest as you scroll down.</p>';
+
+  out += '<div class="map-wrap">';
+  trail.forEach((g, i) => {
+    const side = i % 2 === 0 ? 'mleft' : 'mright';
+    const dm = diffMeta(g.difficulty);
+    const gsteps = stepsByGoal[g.id] || [];
+    const frac = stepFraction(gsteps);
+    const isOpen = !!state.open[g.id];
+    out += '<div class="map-row ' + side + '">' +
+      '<span class="map-tag" style="color:' + dm.color + '">' + dm.label + '</span>' +
+      '<span class="map-stem"></span>' +
+      '<span class="map-dot" style="background:' + dm.color + '">' + (i+1) + '</span>' +
+      '<div class="map-node">' +
+        '<div class="goal-card">' +
+          '<div class="goal-head" onclick="App.toggleGoal(\'' + g.id + '\')">' +
+            '<div class="goal-toprow">' +
+              '<div>' +
+                '<div class="goal-title">' + esc(g.title) + '</div>' +
+                (g.description ? '<div class="goal-desc">' + esc(g.description) + '</div>' : '') +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<span class="badge"><span class="dot" style="background:#3ecf8e"></span>' +
+                  '<span class="' + (g.status==='completed'?'status-completed':'status-active') + '">' + g.status + '</span></span>' +
+                '<span class="chev' + (isOpen?' open':'') + '">▸</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="progress-row">' +
+              '<div class="meter"><div style="width:' + frac.pct + '%;background:#3ecf8e"></div></div>' +
+              '<span class="frac">' + frac.done + '/' + frac.total + ' steps</span>' +
+            '</div>' +
+          '</div>' +
+          (isOpen ? '<div class="steps-inner">' +
+            gsteps.map(s =>
+              '<label class="step-row">' +
+                '<input type="checkbox" ' + (s.completed?'checked':'') + ' onclick="event.stopPropagation();App.toggleStep(\'' + s.id + '\')">' +
+                '<span class="step-title' + (s.completed?' done':'') + '">' + esc(s.title) + '</span>' +
+                (s.completed && s.completed_at ? '<span class="step-meta">done ' + fmtAge(s.completed_at) + '</span>' : '') +
+              '</label>').join('') +
+          '</div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  });
+  out += '</div>';
+
+  return out;
+}
+
+window.App = {
+  setView(v) { state.view = v; render(); },
+  setFilter(f) { state.filter = f; render(); },
+  toggleGoal(id) { state.open[id] = !state.open[id]; render(); },
+  toggleStep(id) {
+    const s = STEPS.find(x => x.id === id);
+    if (!s) return;
+    s.completed = !s.completed;
+    s.completed_at = s.completed ? new Date().toISOString() : null;
+    // Roll the goal's status up from its steps, mirroring the server trigger.
+    const gid = s.goal_id;
+    const gsteps = STEPS.filter(x => x.goal_id === gid);
+    const goal = GOALS.find(g => g.id === gid);
+    if (goal && goal.status !== 'archived') {
+      const allDone = gsteps.length > 0 && gsteps.every(x => x.completed);
+      goal.status = allDone ? 'completed' : 'active';
     }
-    return el;
-  }
+    render();
+  },
+};
 
-  function statsFor(goals) {
-    var totalSteps = 0, doneSteps = 0;
-    goals.forEach(function(g){
-      totalSteps += g.steps.length;
-      doneSteps += g.steps.filter(function(s){ return s.completed; }).length;
-    });
-    return { totalSteps: totalSteps, doneSteps: doneSteps };
-  }
-
-  function render() {
-    root.innerHTML = "";
-    root.appendChild(renderHeader());
-    var view = h("div", {id:"view"});
-    if (state.view === "goals") view.appendChild(renderGoals());
-    else view.appendChild(renderStub(state.view));
-    root.appendChild(view);
-    root.appendChild(h("footer", {class:"note", text:"Preview build \u00b7 synthetic data \u00b7 changes are local to this browser only"}));
-  }
-
-  function renderHeader() {
-    var nav = h("div", {class:"navrow"},
-      navBtn("Chat", "chat"),
-      navBtn("Tasks", "tasks"),
-      navBtn("Goals", "goals")
-    );
-    return h("header", {}, h("h1", {text:"Alleah"}), nav);
-  }
-  function navBtn(label, key) {
-    var cls = "secondary" + (state.view === key ? " active" : "");
-    return h("button", {class: cls, onclick: function(){ state.view = key; render(); }, text: label});
-  }
-  function renderStub(which) {
-    var label = which === "chat" ? "Chat" : "Tasks";
-    return h("div", {class:"empty"},
-      h("p", {class:"muted", text: label + " isn't part of this preview \u2014 this build focuses on the new Goals tab."}));
-  }
-
-  function renderGoals() {
-    var frag = document.createDocumentFragment();
-    var activeGoals = state.goals.filter(function(g){ return g.status === "active"; });
-    var visible = state.goals.filter(function(g){ return state.filter === "all" ? true : g.status === "active"; });
-
-    // --- dashboard summary ---
-    var activeStats = statsFor(activeGoals);
-    var pctActive = activeStats.totalSteps ? Math.round(activeStats.doneSteps / activeStats.totalSteps * 100) : 0;
-    var summary = h("div", {class:"card"},
-      h("div", {class:"summary-top"},
-        h("div", {}, h("span", {class:"summary-num", text: String(activeGoals.length)}), " ", h("span", {class:"muted", text: activeGoals.length === 1 ? "active goal" : "active goals"})),
-        h("span", {class:"small", text: pctActive + "% of active steps done"})
-      ),
-      h("div", {class:"meter"}, h("div", {style:"width:" + pctActive + "%"})),
-      h("div", {class:"summary-grid"},
-        h("div", {class:"summary-stat"}, h("div", {class:"n", text:String(activeStats.doneSteps)}), h("div", {class:"l", text:"steps done"})),
-        h("div", {class:"summary-stat"}, h("div", {class:"n", text:String(activeStats.totalSteps - activeStats.doneSteps)}), h("div", {class:"l", text:"steps left"})),
-        h("div", {class:"summary-stat"}, h("div", {class:"n", text:String(state.goals.filter(function(g){return g.status==="completed";}).length)}), h("div", {class:"l", text:"completed goals"}))
-      )
-    );
-    frag.appendChild(summary);
-
-    // --- filter bar ---
-    var filterBar = h("div", {class:"filter-bar"},
-      filterBtn("Active", "active"),
-      filterBtn("All", "all")
-    );
-    frag.appendChild(filterBar);
-
-    if (!visible.length) {
-      frag.appendChild(h("div", {class:"empty"}, h("p", {class:"muted", text:"No goals here."})));
-      return frag;
-    }
-
-    visible.forEach(function(goal){
-      frag.appendChild(renderGoalCard(goal));
-    });
-    return frag;
-  }
-
-  function filterBtn(label, key) {
-    var cls = "secondary" + (state.filter === key ? " active" : "");
-    return h("button", {class: cls, onclick: function(){ state.filter = key; render(); }, text: label});
-  }
-
-  function renderGoalCard(goal) {
-    var total = goal.steps.length;
-    var done = goal.steps.filter(function(s){ return s.completed; }).length;
-    var pct = total ? Math.round(done / total * 100) : 0;
-    var isOpen = !!state.open[goal.id];
-    var card = h("div", {class:"goal-card" + (isOpen ? " open" : "")});
-
-    var chev = h("span", {class:"chev"}, "\u25B8");
-    var statusBadge = h("span", {class:"badge"},
-      h("span", {class:"dot", style:"background:" + (goal.status === "completed" ? "#3ecf8e" : "#3ecf8e")}),
-      h("span", {class: goal.status === "completed" ? "status-completed" : "status-active", text: goal.status})
-    );
-
-    var head = h("div", {class:"goal-head", onclick: function(){ state.open[goal.id] = !isOpen; render(); }},
-      h("div", {class:"goal-toprow"},
-        h("div", {},
-          h("div", {class:"goal-title", text: goal.title}),
-          goal.description ? h("div", {class:"goal-desc", text: goal.description}) : null
-        ),
-        h("div", {style:"display:flex;align-items:center;gap:8px"}, statusBadge, chev)
-      ),
-      h("div", {class:"progress-row"},
-        h("div", {class:"meter"}, h("div", {style:"width:" + pct + "%"})),
-        h("span", {class:"frac", text: done + "/" + total + " steps"})
-      )
-    );
-    card.appendChild(head);
-
-    var stepsWrap = h("div", {class:"steps"});
-    var inner = h("div", {class:"steps-inner"});
-    goal.steps.forEach(function(step){
-      inner.appendChild(renderStepRow(goal, step));
-    });
-    stepsWrap.appendChild(inner);
-    card.appendChild(stepsWrap);
-
-    return card;
-  }
-
-  function renderStepRow(goal, step) {
-    var checkbox = h("input", {type:"checkbox"});
-    checkbox.checked = step.completed;
-    checkbox.addEventListener("change", function(){
-      step.completed = checkbox.checked;
-      recomputeStatus(goal);
-      saveState(state.goals);
-      render();
-    });
-    var titleEl = h("span", {class:"step-title" + (step.completed ? " done" : ""), text: step.title});
-    var row = h("label", {class:"step-row"}, checkbox, titleEl);
-    if (step.completed) row.appendChild(h("span", {class:"step-meta", text:"done"}));
-    return row;
-  }
-
-  render();
+render();
 })();
 </script>
 
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="2a9e67c9-r1-1785326656">
 <style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
    All classes prefixed apo- to avoid colliding with app styles. */
 
@@ -454,7 +468,7 @@ footer.note{padding:10px 14px calc(10px + env(safe-area-inset-bottom));font-size
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6", "revision": 0, "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": []}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6", "revision": 1, "deploy_marker": "2a9e67c9-r1-1785326656", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 0, "note": "Would you be able to make the goals yo oriented in a way that looks more like a map rather than a list of goals. When clicking on each goal I love the mini objectives on them but just make the goals look smaller, more spread out and connected by lines. I\u2019d like it to look something akin to a scavenger hunt map where the place of the goal boxes alternate from left to right and as you scroll down it gets to the harder and harder goals.", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type
@@ -780,4 +794,5 @@ footer.note{padding:10px 14px calc(10px + env(safe-area-inset-bottom));font-size
   }
 })();
 </script>
+<!-- alleah-overlay-end -->
 </body></html>
