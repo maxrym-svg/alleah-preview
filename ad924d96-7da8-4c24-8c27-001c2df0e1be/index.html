@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah — Goals preview</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px;gap:8px;flex-wrap:wrap}
+h1{font-size:18px;margin:0}
+.navbar{display:flex;gap:6px;padding:0 14px 8px}
+.navbtn{background:#1a1d23;color:#9aa3ad;border:1px solid #2c313a;border-radius:10px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.navbtn.active{background:#3ecf8e;color:#08130d;border-color:#3ecf8e}
+.view{flex:1;overflow-y:auto;padding:8px 14px calc(20px + env(safe-area-inset-bottom))}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;margin-bottom:10px}
+.msg.user{margin-left:auto;background:#3ecf8e;color:#08130d;border-bottom-right-radius:4px}
+.msg.assistant{background:#1a1d23;border:1px solid #2c313a;border-bottom-left-radius:4px}
+.composer{display:flex;gap:8px;padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+textarea,input,select{background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:12px;padding:10px 12px;font:inherit}
+textarea{flex:1;resize:none;min-height:46px}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;border-radius:8px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.muted{color:#9aa3ad;font-size:14px}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:6px 0}
+.meter>div{height:100%;border-radius:4px}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.filterbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px}
+.filterbtn{flex:none;background:#1a1d23;color:#9aa3ad;border:1px solid #2c313a;border-radius:999px;padding:6px 13px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.filterbtn.active{background:#e6e6e6;color:#0f1115;border-color:#e6e6e6}
+.summary{display:flex;gap:14px;flex-wrap:wrap;padding:2px 2px 10px;color:#9aa3ad;font-size:12px}
+.summary b{color:#e6e6e6}
+.goal-title{font-size:15px;font-weight:700;margin:0 0 2px}
+.goal-desc{white-space:pre-wrap;background:#0f1115;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;font-size:13.5px;color:#c7ccd3}
+.addform{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.addform .row2{display:flex;gap:8px}
+.addform .row2>*{flex:1}
+.newgoalbtn{width:100%;text-align:left;background:#1a1d23;color:#9aa3ad;border:1px dashed #2c313a}
+.banner{font-size:12px;color:#9aa3ad;background:#12151a;border:1px solid #2c313a;border-radius:8px;padding:8px 10px;margin:0 0 10px}
+</style></head><body>
+<div id="root"></div>
+<script>
+// ============================================================
+// Alleah — Goals tab preview build.
+// Fully static & self-contained: no network calls, no backend.
+// All goal + difficulty data below is synthetic in-memory fixture
+// data standing in for what the real app would read from the
+// database. Nothing here is written back anywhere.
+// ============================================================
+const now = Date.now();
+const DAY = 86400000;
+
+const DIFFICULTY = {
+  easy:   {label: 'Easy',   color: '#3ecf8e'},
+  medium: {label: 'Medium', color: '#58a6ff'},
+  hard:   {label: 'Hard',   color: '#e0a458'},
+  epic:   {label: 'Epic',   color: '#d68fff'},
+};
+const STATUS_COLOR = {active: '#3ecf8e', completed: '#3ecf8e', paused: '#e0a458', abandoned: '#5c636e'};
+
+let goals = [
+  {
+    id: 'g1', title: 'Run a 10K', category: 'Health', difficulty: 'medium', status: 'active',
+    description: 'Build up long-run mileage on the weekends and keep two easy runs during the week until race pace feels comfortable for the full distance.',
+    progress_pct: 62, streak_days: 14,
+    created_at: now - 40*DAY, target_date: now + 21*DAY,
+  },
+  {
+    id: 'g2', title: 'Ship personal portfolio site', category: 'Career', difficulty: 'hard', status: 'active',
+    description: 'Rebuild the portfolio with three case studies, a proper writeup of the memory-graph project, and a fast static build — no framework bloat.',
+    progress_pct: 30, streak_days: 3,
+    created_at: now - 18*DAY, target_date: now - 2*DAY, // overdue on purpose
+  },
+  {
+    id: 'g3', title: 'Read 12 books this year', category: 'Learning', difficulty: 'easy', status: 'active',
+    description: 'One book a month, mix of fiction and non-fiction. Currently on book 10.',
+    progress_pct: 83, streak_days: 0,
+    created_at: now - 210*DAY, target_date: now + 55*DAY,
+  },
+  {
+    id: 'g4', title: 'Learn conversational Spanish', category: 'Learning', difficulty: 'epic', status: 'active',
+    description: 'Daily app lessons plus one live conversation exchange per week. Long-horizon goal, slow and steady.',
+    progress_pct: 12, streak_days: 5,
+    created_at: now - 9*DAY, target_date: now + 300*DAY,
+  },
+  {
+    id: 'g5', title: 'Meditate daily for a month', category: 'Health', difficulty: 'easy', status: 'completed',
+    description: 'Ten minutes every morning before checking the phone. Finished the full 30 days.',
+    progress_pct: 100, streak_days: 30,
+    created_at: now - 70*DAY, target_date: now - 40*DAY, completed_at: now - 39*DAY,
+  },
+  {
+    id: 'g6', title: 'Launch side-business MVP', category: 'Career', difficulty: 'hard', status: 'completed',
+    description: 'Landing page, waitlist, and first five paying customers. Shipped and validated.',
+    progress_pct: 100, streak_days: 0,
+    created_at: now - 160*DAY, target_date: now - 90*DAY, completed_at: now - 88*DAY,
+  },
+  {
+    id: 'g7', title: 'Train for a marathon', category: 'Health', difficulty: 'epic', status: 'paused',
+    description: 'Paused after a minor knee strain — resuming once cleared by physio. Base mileage was going well before the break.',
+    progress_pct: 45, streak_days: 0,
+    created_at: now - 65*DAY, target_date: now + 80*DAY,
+  },
+  {
+    id: 'g8', title: 'Write a novel draft', category: 'Creative', difficulty: 'hard', status: 'abandoned',
+    description: 'Got to 20k words then priorities shifted. Keeping the notes in case this comes back around.',
+    progress_pct: 20, streak_days: 0,
+    created_at: now - 300*DAY, target_date: now - 120*DAY,
+  },
+];
+let nextId = 9;
+
+function fmtRelDay(ms) {
+  const days = Math.round((ms - now) / DAY);
+  if (days === 0) return 'today';
+  if (days > 0) return 'in ' + days + 'd';
+  return Math.abs(days) + 'd ago';
+}
+function fmtAgeShort(ms) {
+  const days = Math.round((now - ms) / DAY);
+  if (days < 1) return 'today';
+  if (days < 30) return days + 'd ago';
+  if (days < 365) return Math.round(days/30) + 'mo ago';
+  return Math.round(days/365) + 'y ago';
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------------- Chat (static context, not the focus of this preview) ----------------
+function renderChat() {
+  return `
+    <div class="banner">Preview focus: the new <b style="color:#e6e6e6">Goals</b> tab. Chat is shown for context only and is not interactive here.</div>
+    <div class="msg assistant">Talk to me. What you tell me about what you know gets remembered — automatically.</div>
+    <div class="msg user">I want to actually track a few personal goals instead of just journaling about them.</div>
+    <div class="msg assistant">Got it — that's what the new Goals tab is for. Switch over and take a look.</div>
+  `;
+}
+function renderChatComposer() {
+  return `
+    <div class="composer">
+      <textarea placeholder="Message Alleah..." rows="1" disabled></textarea>
+      <button disabled>Send</button>
+    </div>`;
+}
+
+// ---------------- Tasks (static context, not the focus of this preview) ----------------
+function renderTasks() {
+  return `
+    <div class="banner">Preview focus: the new <b style="color:#e6e6e6">Goals</b> tab. Tasks is shown for context only and is not interactive here.</div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="badge"><span class="dot" style="background:#3ecf8e"></span><span style="color:#3ecf8e">build · done</span></span>
+        <span class="small">2h ago</span>
+      </div>
+      <p style="margin:8px 0 4px">add a Goals tab with difficulty and progress tracking</p>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="badge"><span class="dot" style="background:#9aa3ad"></span><span style="color:#9aa3ad">queued</span></span>
+        <span class="small">just now</span>
+      </div>
+      <p style="margin:8px 0 4px">weekly memory digest email</p>
+    </div>`;
+}
+
+// ---------------- Goals (the feature) ----------------
+let goalFilter = 'all';
+let showAddForm = false;
+let openGoalId = null;
+
+function goalMatchesFilter(g) {
+  return goalFilter === 'all' || g.status === goalFilter;
+}
+
+function renderSummary() {
+  const c = {active:0, completed:0, paused:0, abandoned:0};
+  goals.forEach(g => { c[g.status] = (c[g.status]||0) + 1; });
+  return `
+    <div class="summary">
+      <span><b>${c.active||0}</b> active</span>
+      <span><b>${c.completed||0}</b> completed</span>
+      <span><b>${c.paused||0}</b> paused</span>
+      <span><b>${c.abandoned||0}</b> abandoned</span>
+    </div>`;
+}
+
+function renderFilterbar() {
+  const opts = [['all','All'],['active','Active'],['completed','Completed'],['paused','Paused'],['abandoned','Abandoned']];
+  return `<div class="filterbar">` + opts.map(([k,label]) =>
+    `<button class="filterbtn${goalFilter===k?' active':''}" data-filter="${k}">${label}</button>`
+  ).join('') + `</div>`;
+}
+
+function renderGoalCard(g) {
+  const diff = DIFFICULTY[g.difficulty];
+  const color = STATUS_COLOR[g.status];
+  const open = openGoalId === g.id;
+  const overdue = g.status === 'active' && g.target_date < now;
+  const meterColor = overdue ? '#ff7b72' : color;
+  let dateLine;
+  if (g.status === 'completed') dateLine = 'completed ' + fmtAgeShort(g.completed_at);
+  else if (g.status === 'active') dateLine = (overdue ? 'was due ' : 'due ') + fmtRelDay(g.target_date);
+  else dateLine = 'target ' + fmtRelDay(g.target_date);
+  return `
+    <div class="card" data-goal="${g.id}" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <p class="goal-title">${esc(g.title)}</p>
+        <span class="pill" style="background:${diff.color}22;color:${diff.color};border:1px solid ${diff.color}55">${diff.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="badge"><span class="dot${g.status==='active'?' pulse':''}" style="background:${color}"></span><span style="color:${color}">${g.status}</span></span>
+        <span class="small">${esc(g.category)}</span>
+        <span class="small">·</span>
+        <span class="small" style="color:${overdue?'#ff7b72':'#9aa3ad'}">${dateLine}</span>
+      </div>
+      <div class="meter"><div style="width:${g.progress_pct}%;background:${meterColor}"></div></div>
+      <div class="small">${g.progress_pct}% complete${g.streak_days ? '  ·  🔥 ' + g.streak_days + ' day streak' : ''}</div>
+      ${open ? `<div class="goal-desc">${esc(g.description)}</div>` : ''}
+    </div>`;
+}
+
+function renderAddForm() {
+  if (!showAddForm) return `<button class="secondary newgoalbtn" id="openAddForm">+ New goal</button>`;
+  return `
+    <div class="card">
+      <p class="goal-title" style="margin-bottom:8px">New goal</p>
+      <div class="addform">
+        <input id="ng_title" placeholder="Goal title">
+        <div class="row2">
+          <select id="ng_category">
+            <option>Health</option><option>Career</option><option>Learning</option><option>Creative</option><option>Finance</option>
+          </select>
+          <select id="ng_difficulty">
+            <option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="epic">Epic</option>
+          </select>
+        </div>
+        <input id="ng_target" type="date">
+        <div class="row2">
+          <button class="secondary" id="cancelAddForm">Cancel</button>
+          <button id="submitAddForm">Add goal</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderGoals() {
+  const list = goals.filter(goalMatchesFilter);
+  return `
+    ${renderSummary()}
+    ${renderFilterbar()}
+    ${renderAddForm()}
+    ${list.length ? list.map(renderGoalCard).join('') : '<p class="muted">No goals in this filter yet.</p>'}
+  `;
+}
+
+// ---------------- app shell ----------------
+let view = 'goals';
+
+function render() {
+  const root = document.getElementById('root');
+  root.innerHTML = `
+    <header>
+      <h1>Alleah</h1>
+      <div style="display:flex;gap:8px">
+        <button class="secondary" id="signout">Sign out</button>
+      </div>
+    </header>
+    <div class="navbar">
+      <button class="navbtn${view==='chat'?' active':''}" data-view="chat">Chat</button>
+      <button class="navbtn${view==='tasks'?' active':''}" data-view="tasks">Tasks</button>
+      <button class="navbtn${view==='goals'?' active':''}" data-view="goals">Goals</button>
+    </div>
+    <div class="view" id="viewbody">
+      ${view === 'chat' ? renderChat() : view === 'tasks' ? renderTasks() : renderGoals()}
+    </div>
+    ${view === 'chat' ? renderChatComposer() : ''}
+  `;
+  wire();
+}
+
+function wire() {
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+    view = b.getAttribute('data-view'); render();
+  }));
+  const so = document.getElementById('signout');
+  if (so) so.addEventListener('click', () => alert('Preview only — sign out is disabled.'));
+  if (view !== 'goals') return;
+
+  document.querySelectorAll('.filterbtn').forEach(b => b.addEventListener('click', () => {
+    goalFilter = b.getAttribute('data-filter'); render();
+  }));
+  document.querySelectorAll('[data-goal]').forEach(card => card.addEventListener('click', (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+    const id = card.getAttribute('data-goal');
+    openGoalId = openGoalId === id ? null : id;
+    render();
+  }));
+  const openBtn = document.getElementById('openAddForm');
+  if (openBtn) openBtn.addEventListener('click', () => { showAddForm = true; render(); });
+  const cancelBtn = document.getElementById('cancelAddForm');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => { showAddForm = false; render(); });
+  const submitBtn = document.getElementById('submitAddForm');
+  if (submitBtn) submitBtn.addEventListener('click', () => {
+    const title = document.getElementById('ng_title').value.trim();
+    if (!title) { alert('Give the goal a title.'); return; }
+    const category = document.getElementById('ng_category').value;
+    const difficulty = document.getElementById('ng_difficulty').value;
+    const targetVal = document.getElementById('ng_target').value;
+    const target_date = targetVal ? new Date(targetVal).getTime() : now + 30*DAY;
+    goals = [{
+      id: 'g' + (nextId++), title, category, difficulty, status: 'active',
+      description: '(no description yet)', progress_pct: 0, streak_days: 0,
+      created_at: now, target_date,
+    }, ...goals];
+    showAddForm = false;
+    render();
+  });
+}
+
+render();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="ad924d96-r0-1785327944">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "ad924d96-7da8-4c24-8c27-001c2df0e1be", "revision": 0, "deploy_marker": "ad924d96-r0-1785327944", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
