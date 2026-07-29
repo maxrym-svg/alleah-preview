@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah · Goals</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{min-height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:8px}
+h1{font-size:18px;margin:0}
+.navrow{display:flex;gap:6px}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:7px 13px;border-radius:8px}
+button.secondary.active{background:#3ecf8e;color:#08130d}
+button:disabled{opacity:.5}
+.muted{color:#9aa3ad;font-size:14px}
+#view{flex:1;overflow-y:auto;padding:8px 14px 24px}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:14px 16px;margin:10px 0}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:6px 0}
+.meter>div{height:100%;border-radius:4px;background:#3ecf8e;transition:width .35s ease}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.summary-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.summary-num{font-size:26px;font-weight:700;color:#e6e6e6}
+.summary-grid{display:flex;gap:18px;margin-top:10px}
+.summary-stat{flex:1}
+.summary-stat .n{font-size:20px;font-weight:700}
+.summary-stat .l{font-size:11px;color:#9aa3ad;text-transform:uppercase;letter-spacing:.04em}
+.filter-bar{display:flex;gap:6px;margin:14px 0 4px}
+.goal-card{background:#12151a;border:1px solid #2c313a;border-radius:12px;margin:10px 0;overflow:hidden}
+.goal-head{padding:13px 15px;display:flex;flex-direction:column;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.goal-toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.goal-title{font-weight:600;font-size:15px;line-height:1.35}
+.goal-desc{font-size:12.5px;color:#9aa3ad;margin-top:1px}
+.chev{flex-shrink:0;color:#9aa3ad;transition:transform .2s ease;margin-top:2px}
+.goal-card.open .chev{transform:rotate(90deg)}
+.progress-row{display:flex;align-items:center;gap:8px;margin-top:2px}
+.progress-row .meter{flex:1;margin:0}
+.progress-row .frac{font-size:12px;color:#9aa3ad;white-space:nowrap}
+.steps{max-height:0;overflow:hidden;transition:max-height .25s ease;border-top:1px solid #2c313a}
+.goal-card.open .steps{max-height:600px}
+.steps-inner{padding:6px 15px 12px}
+.step-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #1c2027}
+.step-row:last-child{border-bottom:none}
+.step-row input[type=checkbox]{width:19px;height:19px;accent-color:#3ecf8e;flex-shrink:0;cursor:pointer}
+.step-title{font-size:14px}
+.step-title.done{color:#6f7580;text-decoration:line-through}
+.step-meta{margin-left:auto;font-size:11px;color:#5c636e;white-space:nowrap}
+.status-active{color:#3ecf8e}
+.status-completed{color:#9aa3ad}
+.empty{padding:30px 6px;text-align:center}
+footer.note{padding:10px 14px calc(10px + env(safe-area-inset-bottom));font-size:11px;color:#5c636e;text-align:center}
+</style></head><body>
+<div id="root"></div>
+<script>
+(function(){
+  "use strict";
+
+  // ---- synthetic fixture data (no network, no backend) ----
+  var STORAGE_KEY = "alleah_goals_preview_v1";
+  var seedGoals = [
+    {
+      id: "g1", title: "Launch personal website", status: "active",
+      description: "Portfolio site with blog and project showcase.",
+      steps: [
+        {id:"g1s1", title:"Buy domain and hosting", completed:true},
+        {id:"g1s2", title:"Design homepage wireframe", completed:true},
+        {id:"g1s3", title:"Build homepage in code", completed:false},
+        {id:"g1s4", title:"Write 3 launch blog posts", completed:false},
+        {id:"g1s5", title:"Set up analytics", completed:false}
+      ]
+    },
+    {
+      id: "g2", title: "Run a half marathon", status: "active",
+      description: "First half marathon this fall.",
+      steps: [
+        {id:"g2s1", title:"Buy proper running shoes", completed:true},
+        {id:"g2s2", title:"Build base mileage (15 mi/wk)", completed:true},
+        {id:"g2s3", title:"Complete a 10-mile long run", completed:true},
+        {id:"g2s4", title:"Register for the race", completed:false},
+        {id:"g2s5", title:"Taper week", completed:false},
+        {id:"g2s6", title:"Race day", completed:false}
+      ]
+    },
+    {
+      id: "g3", title: "Learn conversational Spanish", status: "active",
+      description: "Enough Spanish for a trip in December.",
+      steps: [
+        {id:"g3s1", title:"Finish beginner course", completed:true},
+        {id:"g3s2", title:"Practice 15 min/day for 30 days", completed:false},
+        {id:"g3s3", title:"Have a 10-min chat with a tutor", completed:false},
+        {id:"g3s4", title:"Watch a movie without subtitles", completed:false}
+      ]
+    },
+    {
+      id: "g4", title: "Build a $5,000 emergency fund", status: "active",
+      description: "Three months of essential expenses saved.",
+      steps: [
+        {id:"g4s1", title:"Open high-yield savings account", completed:true},
+        {id:"g4s2", title:"Automate $250/mo transfer", completed:true},
+        {id:"g4s3", title:"Reach $2,500", completed:true},
+        {id:"g4s4", title:"Reach $5,000", completed:false}
+      ]
+    },
+    {
+      id: "g5", title: "Read 12 books this year", status: "completed",
+      description: "One book a month, mixing fiction and nonfiction.",
+      steps: (function(){
+        var arr = [];
+        for (var i=1;i<=12;i++) arr.push({id:"g5s"+i, title:"Book "+i+" finished", completed:true});
+        return arr;
+      })()
+    }
+  ];
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return clone(seedGoals);
+      var saved = JSON.parse(raw);
+      // merge saved completion flags onto the seed shape so structure edits here still apply
+      return seedGoals.map(function(g){
+        var sg = saved.find(function(x){ return x.id === g.id; });
+        return {
+          id: g.id, title: g.title, description: g.description,
+          status: g.status,
+          steps: g.steps.map(function(s){
+            var ss = sg && sg.steps ? sg.steps.find(function(x){ return x.id === s.id; }) : null;
+            return { id: s.id, title: s.title, completed: ss ? !!ss.completed : s.completed };
+          })
+        };
+      });
+    } catch (e) { return clone(seedGoals); }
+  }
+  function clone(x){ return JSON.parse(JSON.stringify(x)); }
+  function saveState(goals) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+  }
+  function recomputeStatus(goal) {
+    // mirrors the real app's DB trigger: all steps done -> completed, otherwise active
+    // (archived goals aren't part of this fixture set, so we don't need to preserve one here)
+    var total = goal.steps.length;
+    var done = goal.steps.filter(function(s){ return s.completed; }).length;
+    if (total > 0 && done === total) goal.status = "completed";
+    else if (goal.status === "completed") goal.status = "active";
+  }
+
+  var state = {
+    goals: loadState(),
+    open: {},        // goalId -> bool
+    filter: "active", // 'active' | 'all'
+    view: "goals"     // 'chat' | 'tasks' | 'goals'
+  };
+
+  var root = document.getElementById("root");
+
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function(k){
+      if (k === "class") el.className = attrs[k];
+      else if (k === "text") el.textContent = attrs[k];
+      else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), attrs[k]);
+      else el.setAttribute(k, attrs[k]);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var child = arguments[i];
+      if (child == null) continue;
+      if (Array.isArray(child)) child.forEach(function(c){ if (c) el.appendChild(c); });
+      else if (typeof child === "string") el.appendChild(document.createTextNode(child));
+      else el.appendChild(child);
+    }
+    return el;
+  }
+
+  function statsFor(goals) {
+    var totalSteps = 0, doneSteps = 0;
+    goals.forEach(function(g){
+      totalSteps += g.steps.length;
+      doneSteps += g.steps.filter(function(s){ return s.completed; }).length;
+    });
+    return { totalSteps: totalSteps, doneSteps: doneSteps };
+  }
+
+  function render() {
+    root.innerHTML = "";
+    root.appendChild(renderHeader());
+    var view = h("div", {id:"view"});
+    if (state.view === "goals") view.appendChild(renderGoals());
+    else view.appendChild(renderStub(state.view));
+    root.appendChild(view);
+    root.appendChild(h("footer", {class:"note", text:"Preview build \u00b7 synthetic data \u00b7 changes are local to this browser only"}));
+  }
+
+  function renderHeader() {
+    var nav = h("div", {class:"navrow"},
+      navBtn("Chat", "chat"),
+      navBtn("Tasks", "tasks"),
+      navBtn("Goals", "goals")
+    );
+    return h("header", {}, h("h1", {text:"Alleah"}), nav);
+  }
+  function navBtn(label, key) {
+    var cls = "secondary" + (state.view === key ? " active" : "");
+    return h("button", {class: cls, onclick: function(){ state.view = key; render(); }, text: label});
+  }
+  function renderStub(which) {
+    var label = which === "chat" ? "Chat" : "Tasks";
+    return h("div", {class:"empty"},
+      h("p", {class:"muted", text: label + " isn't part of this preview \u2014 this build focuses on the new Goals tab."}));
+  }
+
+  function renderGoals() {
+    var frag = document.createDocumentFragment();
+    var activeGoals = state.goals.filter(function(g){ return g.status === "active"; });
+    var visible = state.goals.filter(function(g){ return state.filter === "all" ? true : g.status === "active"; });
+
+    // --- dashboard summary ---
+    var activeStats = statsFor(activeGoals);
+    var pctActive = activeStats.totalSteps ? Math.round(activeStats.doneSteps / activeStats.totalSteps * 100) : 0;
+    var summary = h("div", {class:"card"},
+      h("div", {class:"summary-top"},
+        h("div", {}, h("span", {class:"summary-num", text: String(activeGoals.length)}), " ", h("span", {class:"muted", text: activeGoals.length === 1 ? "active goal" : "active goals"})),
+        h("span", {class:"small", text: pctActive + "% of active steps done"})
+      ),
+      h("div", {class:"meter"}, h("div", {style:"width:" + pctActive + "%"})),
+      h("div", {class:"summary-grid"},
+        h("div", {class:"summary-stat"}, h("div", {class:"n", text:String(activeStats.doneSteps)}), h("div", {class:"l", text:"steps done"})),
+        h("div", {class:"summary-stat"}, h("div", {class:"n", text:String(activeStats.totalSteps - activeStats.doneSteps)}), h("div", {class:"l", text:"steps left"})),
+        h("div", {class:"summary-stat"}, h("div", {class:"n", text:String(state.goals.filter(function(g){return g.status==="completed";}).length)}), h("div", {class:"l", text:"completed goals"}))
+      )
+    );
+    frag.appendChild(summary);
+
+    // --- filter bar ---
+    var filterBar = h("div", {class:"filter-bar"},
+      filterBtn("Active", "active"),
+      filterBtn("All", "all")
+    );
+    frag.appendChild(filterBar);
+
+    if (!visible.length) {
+      frag.appendChild(h("div", {class:"empty"}, h("p", {class:"muted", text:"No goals here."})));
+      return frag;
+    }
+
+    visible.forEach(function(goal){
+      frag.appendChild(renderGoalCard(goal));
+    });
+    return frag;
+  }
+
+  function filterBtn(label, key) {
+    var cls = "secondary" + (state.filter === key ? " active" : "");
+    return h("button", {class: cls, onclick: function(){ state.filter = key; render(); }, text: label});
+  }
+
+  function renderGoalCard(goal) {
+    var total = goal.steps.length;
+    var done = goal.steps.filter(function(s){ return s.completed; }).length;
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var isOpen = !!state.open[goal.id];
+    var card = h("div", {class:"goal-card" + (isOpen ? " open" : "")});
+
+    var chev = h("span", {class:"chev"}, "\u25B8");
+    var statusBadge = h("span", {class:"badge"},
+      h("span", {class:"dot", style:"background:" + (goal.status === "completed" ? "#3ecf8e" : "#3ecf8e")}),
+      h("span", {class: goal.status === "completed" ? "status-completed" : "status-active", text: goal.status})
+    );
+
+    var head = h("div", {class:"goal-head", onclick: function(){ state.open[goal.id] = !isOpen; render(); }},
+      h("div", {class:"goal-toprow"},
+        h("div", {},
+          h("div", {class:"goal-title", text: goal.title}),
+          goal.description ? h("div", {class:"goal-desc", text: goal.description}) : null
+        ),
+        h("div", {style:"display:flex;align-items:center;gap:8px"}, statusBadge, chev)
+      ),
+      h("div", {class:"progress-row"},
+        h("div", {class:"meter"}, h("div", {style:"width:" + pct + "%"})),
+        h("span", {class:"frac", text: done + "/" + total + " steps"})
+      )
+    );
+    card.appendChild(head);
+
+    var stepsWrap = h("div", {class:"steps"});
+    var inner = h("div", {class:"steps-inner"});
+    goal.steps.forEach(function(step){
+      inner.appendChild(renderStepRow(goal, step));
+    });
+    stepsWrap.appendChild(inner);
+    card.appendChild(stepsWrap);
+
+    return card;
+  }
+
+  function renderStepRow(goal, step) {
+    var checkbox = h("input", {type:"checkbox"});
+    checkbox.checked = step.completed;
+    checkbox.addEventListener("change", function(){
+      step.completed = checkbox.checked;
+      recomputeStatus(goal);
+      saveState(state.goals);
+      render();
+    });
+    var titleEl = h("span", {class:"step-title" + (step.completed ? " done" : ""), text: step.title});
+    var row = h("label", {class:"step-row"}, checkbox, titleEl);
+    if (step.completed) row.appendChild(h("span", {class:"step-meta", text:"done"}));
+    return row;
+  }
+
+  render();
+})();
+</script>
+
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6", "revision": 0, "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+</body></html>

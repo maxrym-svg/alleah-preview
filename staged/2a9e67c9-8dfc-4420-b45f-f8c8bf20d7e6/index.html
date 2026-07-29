@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px}
+h1{font-size:18px;margin:0}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:#3ecf8e;color:#08130d;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:#1a1d23;border:1px solid #2c313a;border-bottom-left-radius:4px}
+.cites{align-self:flex-start;font-size:12px;color:#9aa3ad;margin-top:-4px;padding:0 6px}
+.composer{display:flex;gap:8px;padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+textarea{flex:1;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:120px}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;border-radius:8px}
+button.secondary.active{background:#3ecf8e;color:#08130d}
+button:disabled{opacity:.5}
+input{width:100%;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:10px;padding:12px;font:inherit}
+.auth{padding:16px 14px}
+.auth button{padding:12px 18px;margin-top:10px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.muted{color:#9aa3ad;font-size:14px}
+.err{color:#ff7b72;font-size:14px;padding:0 14px}
+.typing{align-self:flex-start;color:#9aa3ad;font-size:14px;padding:0 6px}
+#tasks{flex:1;overflow-y:auto;padding:8px 14px}
+#goals{flex:1;overflow-y:auto;padding:8px 14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.segbar{display:flex;gap:2px;margin:4px 0}
+.seg{flex:1;height:8px;border-radius:2px;background:#2c313a}
+.seg.on{background:#3ecf8e}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:4px 0}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
+.meter>div{height:100%;border-radius:4px;transition:width .35s ease}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.task-full{white-space:pre-wrap;background:#12151a;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;max-height:320px;overflow-y:auto;font-size:14px}
+.summary-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.summary-num{font-size:26px;font-weight:700;color:#e6e6e6}
+.summary-grid{display:flex;gap:18px;margin-top:10px}
+.summary-stat{flex:1}
+.summary-stat .n{font-size:20px;font-weight:700}
+.summary-stat .l{font-size:11px;color:#9aa3ad;text-transform:uppercase;letter-spacing:.04em}
+.filter-bar{display:flex;gap:6px;margin:14px 0 4px}
+.goal-card{background:#12151a;border:1px solid #2c313a;border-radius:12px;margin:10px 0;overflow:hidden}
+.goal-head{padding:13px 15px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.goal-toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.goal-title{font-weight:600;font-size:15px;line-height:1.35}
+.goal-desc{font-size:12.5px;color:#9aa3ad;margin-top:1px}
+.chev{flex-shrink:0;color:#9aa3ad;transition:transform .2s ease;margin-top:2px;display:inline-block}
+.chev.open{transform:rotate(90deg)}
+.progress-row{display:flex;align-items:center;gap:8px;margin-top:2px}
+.progress-row .meter{flex:1;margin:0}
+.progress-row .frac{font-size:12px;color:#9aa3ad;white-space:nowrap}
+.steps-inner{padding:6px 15px 12px;border-top:1px solid #2c313a}
+.step-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #1c2027;cursor:pointer}
+.step-row:last-child{border-bottom:none}
+.step-row input[type=checkbox]{width:19px;height:19px;accent-color:#3ecf8e;flex-shrink:0;cursor:pointer}
+.step-title{font-size:14px}
+.step-title.done{color:#6f7580;text-decoration:line-through}
+.step-meta{margin-left:auto;font-size:11px;color:#5c636e;white-space:nowrap}
+.status-active{color:#3ecf8e}
+.status-completed{color:#9aa3ad}
+</style></head><body>
+<div id="root"></div>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import React from "https://esm.sh/react@18";
+import { createRoot } from "https://esm.sh/react-dom@18/client";
+const h = React.createElement;
+const SB_URL = "https://sphnmcjlxxzgovisgepo.supabase.co";
+const supabase = createClient(SB_URL, "sb_publishable_vVfIttSbf_XLWKl2xahBWA_-sXU34L0");
+const HISTORY_KEY = "alleah_chat_v1";
+
+function Auth() {
+  const [email, setEmail] = React.useState('');
+  const [pw, setPw] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  async function go(mode) {
+    setBusy(true); setMsg('');
+    const res = mode === 'up'
+      ? await supabase.auth.signUp({email, password: pw})
+      : await supabase.auth.signInWithPassword({email, password: pw});
+    setBusy(false);
+    if (res.error) setMsg(res.error.message);
+    else if (mode === 'up' && !res.data.session) setMsg('Check your email to confirm, then sign in.');
+  }
+  return h('div', {className:'auth'},
+    h('h1', null, 'Alleah'),
+    h('div', {style:{height:'12px'}}),
+    h('input', {placeholder:'email', type:'email', value:email, onChange:e=>setEmail(e.target.value)}),
+    h('div', {style:{height:'8px'}}),
+    h('input', {placeholder:'password', type:'password', value:pw, onChange:e=>setPw(e.target.value)}),
+    h('div', {className:'row'},
+      h('button', {disabled:busy, onClick:()=>go('in')}, 'Sign in'),
+      h('button', {className:'secondary', disabled:busy, onClick:()=>go('up')}, 'Sign up')),
+    msg ? h('p', {className:'muted'}, msg) : null);
+}
+
+function Chat(props) {
+  const [messages, setMessages] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
+  });
+  const [text, setText] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [view, setView] = React.useState('chat');
+  const endRef = React.useRef(null);
+  React.useEffect(() => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-60)));
+    endRef.current && endRef.current.scrollIntoView({behavior:'smooth'});
+  }, [messages, busy]);
+
+  async function send() {
+    const content = text.trim();
+    if (!content || busy) return;
+    setErr(''); setText('');
+    const next = [...messages, {role:'user', content}];
+    setMessages(next); setBusy(true);
+    try {
+      const res = await fetch(SB_URL + '/functions/v1/ask', {
+        method:'POST',
+        headers:{'content-type':'application/json','authorization':'Bearer ' + props.session.access_token},
+        body: JSON.stringify({messages: next.slice(-10).map(m => ({role: m.role, content: m.content}))})
+      });
+      const out = await res.json();
+      if (out.error) setErr('Error: ' + out.error);
+      else setMessages(m => [...m, {role:'assistant', content: out.answer, folders: out.folders || []}]);
+    } catch (e) { setErr('Error: ' + e); }
+    setBusy(false);
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  return h(React.Fragment, null,
+    h('header', null,
+      h('h1', null, 'Alleah'),
+      h('div', {style:{display:'flex',gap:'6px',flexWrap:'wrap',justifyContent:'flex-end'}},
+        h('button', {className:'secondary' + (view==='chat'?' active':''), style:{marginTop:0}, onClick:()=>setView('chat')}, 'Chat'),
+        h('button', {className:'secondary' + (view==='tasks'?' active':''), style:{marginTop:0}, onClick:()=>setView('tasks')}, 'Tasks'),
+        h('button', {className:'secondary' + (view==='goals'?' active':''), style:{marginTop:0}, onClick:()=>setView('goals')}, 'Goals'),
+        h('button', {className:'secondary', onClick:()=>{ if(confirm('Clear this conversation? (Your memory folders are not affected.)')) setMessages([]); }}, 'New chat'),
+        h('button', {className:'secondary', onClick:()=>supabase.auth.signOut()}, 'Sign out'))),
+    view === 'tasks' ? h(Tasks, {session: props.session}) :
+    view === 'goals' ? h(Goals, {session: props.session}) : h(React.Fragment, null,
+    h('div', {id:'thread'},
+      messages.length === 0 ? h('p', {className:'muted', style:{padding:'0 6px'}}, 'Talk to me. What you tell me about what you know gets remembered - automatically.') : null,
+      messages.map((m, i) => h(React.Fragment, {key:i},
+        h('div', {className:'msg ' + m.role}, m.content),
+        m.folders && m.folders.length
+          ? h('div', {className:'cites'}, 'memory: ' + m.folders.map(f => '[' + f.n + '] ' + f.title).join('  '))
+          : null)),
+      busy ? h('div', {className:'typing'}, 'thinking...') : null,
+      h('div', {ref:endRef})),
+    err ? h('p', {className:'err'}, err) : null,
+    h('div', {className:'composer'},
+      h('textarea', {placeholder:'Message Alleah...', value:text, rows:1, onChange:e=>setText(e.target.value), onKeyDown:onKey}),
+      h('button', {disabled:busy || !text.trim(), onClick:send}, 'Send'))));
+}
+
+// ===== Task tray =====
+// Three meters visualize BUDGET CONSUMED (steps / spend / time) - deliberately no
+// percent-complete bar anywhere: completion isn't knowable.
+const STATUS_COLOR = {queued:'#9aa3ad', running:'#3ecf8e', done:'#3ecf8e', capped:'#e0a458', failed:'#ff7b72', cancelled:'#5c636e'};
+
+function fmtAge(iso) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.floor(m/60) + 'h ago';
+  return Math.floor(m/1440) + 'd ago';
+}
+
+function TaskCard(props) {
+  const t = props.t;
+  const [open, setOpen] = React.useState(false);
+  const active = t.status === 'queued' || t.status === 'running';
+  // Kind-aware budget caps: build/revision run on the larger build budget.
+  const CAP = (t.kind === 'build' || t.kind === 'revision')
+    ? {steps: 50, spend: 2.00, min: 30}
+    : {steps: 25, spend: 0.50, min: 15};
+  const steps = Math.min(t.steps_used || 0, CAP.steps);
+  const spend = Math.min(Number(t.spend_usd) || 0, CAP.spend);
+  const spendRatio = spend / CAP.spend;
+  const endMs = t.completed_at ? new Date(t.completed_at).getTime() : Date.now();
+  const elapsedMs = Math.max(0, Math.min(endMs - new Date(t.created_at).getTime(), CAP.min*60000));
+  const elapsed = Math.floor(elapsedMs/60000) + 'm ' + Math.floor((elapsedMs%60000)/1000) + 's';
+  const spendColor = spendRatio < 0.5 ? '#3ecf8e' : spendRatio < 0.8 ? '#e0a458' : '#ff7b72';
+  const color = STATUS_COLOR[t.status] || '#9aa3ad';
+  const pv = props.preview;
+  const rvw = props.review;
+  const sha = rvw ? (/audited staged commit: ([0-9a-f]{7,40})/i.exec(rvw) || [])[1] : null;
+  // Clean verdict needs POSITIVE evidence: an audited SHA plus an explicit no-findings
+  // marker, and no findings SECTION. A findings section is an anchored "Findings:" line
+  // not immediately saying none/0 - so "no findings in the CSS" elsewhere can't cancel
+  // a real findings list. Ambiguity defaults to "ask Alleah" - never green.
+  const saysClean = rvw ? /\bno findings\b|\b0 findings\b|\bverdict:\s*clean\b|\bfindings:\s*(none|0)\b/i.test(rvw) : false;
+  const hasFindings = rvw ? /^\s*findings\s*:(?!\s*(none|0)\b)/mi.test(rvw) : false;
+  const clean = !!sha && saysClean && !hasFindings;
+  const safeUrl = pv && typeof pv.preview_url === 'string' && /^https:\/\//.test(pv.preview_url);
+  return h('div', {className:'card'},
+    h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}},
+      h('span', {className:'badge'},
+        h('span', {className:'dot' + (t.status==='running'?' pulse':''), style:{background:color}}),
+        h('span', {style:{color:color}}, (t.kind && t.kind !== 'research' ? t.kind + ' · ' : '') + t.status)),
+      h('span', {className:'small'}, fmtAge(t.created_at)),
+      active ? h('button', {className:'secondary', style:{marginTop:0,padding:'4px 10px',fontSize:'12px'},
+        onClick:function(){ if(confirm('Cancel this task?')) props.onCancel(t.id); }}, 'Cancel') : null),
+    pv && !(pv.status === 'expired' && !safeUrl) ? h('p', {className:'small', style:{margin:'6px 0 0'}},
+      // preview_url is worker-written: only render it as a link when it's a real https URL.
+      // No URL while building is normal; no URL otherwise is suspect.
+      safeUrl ? h('a', {href: pv.preview_url, target:'_blank', rel:'noopener', style:{color:'#3ecf8e'}}, 'Preview ↗')
+              : h('span', {style:{color:'#9aa3ad'}}, pv.status === 'building' ? 'preview building…' : 'preview url missing'),
+      '  rev ' + pv.revision + ' · ' + pv.status,
+      rvw ? (clean
+        ? h('span', null, '  ·  review: clean ✓  ',
+            h('a', {href:'https://github.com/maxrym-svg/alleah/actions/workflows/promote-preview.yml', target:'_blank', rel:'noopener', style:{color:'#3ecf8e'}}, 'Promote ↗'),
+            '  sha ' + sha.slice(0,12) + '…')
+        : hasFindings
+          ? h('span', {style:{color:'#e0a458'}}, '  ·  review: findings - ask Alleah')
+          : h('span', {style:{color:'#9aa3ad'}}, '  ·  review done - ask Alleah for the verdict')) : null) : null,
+    h('p', {style:{margin:'8px 0 4px',cursor:'pointer'}, onClick:function(){setOpen(!open)}},
+      (function(){
+        const label = t.kind === 'review'
+          ? 'audit of build ' + (t.instruction || '').trim().slice(0, 8)
+          : (t.instruction || '');
+        return open ? label : (label.length > 110 ? label.slice(0,110) + '...' : label);
+      })()),
+    t.status === 'running' && t.progress ? h('p', {className:'small', style:{color:'#e6e6e6'}}, '▸ ' + t.progress) : null,
+    active ? h('div', null,
+      h('div', {className:'small'}, 'steps used: ' + steps + ' / ' + CAP.steps),
+      h('div', {className:'segbar'}, Array.from({length: CAP.steps}, function(_, i){
+        return h('span', {key:i, className:'seg' + (i < steps ? ' on' : '')}); })),
+      h('div', {className:'small'}, 'spend: $' + spend.toFixed(2) + ' / $' + CAP.spend.toFixed(2) + ' cap'),
+      h('div', {className:'meter'}, h('div', {style:{width:(spendRatio*100)+'%',background:spendColor}})),
+      h('div', {className:'small'}, 'time since queued: ' + elapsed + ' / ' + CAP.min + 'm limit (worker may start up to 1m after queuing)'),
+      h('div', {className:'meter'}, h('div', {style:{width:(elapsedMs/(CAP.min*60000)*100)+'%',background:'#3ecf8e'}}))) : null,
+    open ? h('div', null,
+      t.result ? h('div', {className:'task-full'}, t.result) : null,
+      t.error ? h('p', {className:'err', style:{padding:0}}, t.error) : null,
+      h('p', {className:'small'}, 'steps ' + (t.steps_used ?? 0) + ' · $' + (Number(t.spend_usd)||0).toFixed(2) +
+        ' · queued ' + new Date(t.created_at).toLocaleString() +
+        (t.completed_at ? ' · finished ' + new Date(t.completed_at).toLocaleString() : ''))) : null);
+}
+
+function Tasks(props) {
+  const [tasks, setTasks] = React.useState([]);
+  const [previews, setPreviews] = React.useState({});
+  const [reviews, setReviews] = React.useState({});
+  const [msg, setMsg] = React.useState('loading...');
+  async function load() {
+    const r = await supabase.from('worker_tasks').select('*').order('created_at', {ascending:false}).limit(50);
+    if (r.error) { setMsg('Error: ' + r.error.message); return; }
+    setTasks(r.data);
+    setMsg(r.data.length ? '' : 'No tasks yet. Say "Alleah, start a task" in chat.');
+    // latest done review per build task (review instruction = build task id)
+    const rv = {};
+    r.data.filter(function(t){ return t.kind === 'review' && t.status === 'done' && t.result; })
+      .forEach(function(t){ const key = (t.instruction || '').trim(); if (!rv[key]) rv[key] = t.result; });
+    setReviews(rv);
+    const p = await supabase.from('preview_tasks').select('task_id,status,revision,preview_url');
+    if (!p.error) {
+      const map = {};
+      p.data.forEach(function(x){ map[x.task_id] = x; });
+      setPreviews(map);
+    }
+  }
+  React.useEffect(function(){
+    load(); // initial load always runs; only the polls are visibility-gated
+    const iv = setInterval(function(){ if (document.visibilityState === 'visible') load(); }, 5000);
+    return function(){ clearInterval(iv); };
+  }, []);
+  async function cancel(id) {
+    // Guarded: can never clobber a terminal status that landed after render
+    await supabase.from('worker_tasks').update({status:'cancelled'}).eq('id', id).in('status', ['queued','running']);
+    load();
+  }
+  return h('div', {id:'tasks'},
+    msg ? h('p', {className:'muted'}, msg) : null,
+    tasks.map(function(t){ return h(TaskCard, {key:t.id, t:t, onCancel:cancel, preview:previews[t.id], review:reviews[String(t.id)]}); }));
+}
+
+// ===== Goals tab =====
+// Dashboard overview of active goals, expandable per-goal panels, and step
+// checkboxes. goals.status is rolled up server-side (migration 006 trigger) so it
+// always reflects goal_steps.completed even after edits from another device -
+// we just reload after a toggle rather than trying to guess the rollup locally.
+
+function stepFraction(steps) {
+  const total = steps.length;
+  const done = steps.filter(function(s){ return s.completed; }).length;
+  return {total: total, done: done, pct: total ? Math.round(done/total*100) : 0};
+}
+
+function StepRow(props) {
+  const s = props.step;
+  return h('label', {className:'step-row'},
+    h('input', {type:'checkbox', checked:s.completed, disabled:props.busy, onChange:function(){ props.onToggle(s); }}),
+    h('span', {className:'step-title' + (s.completed ? ' done' : '')}, s.title),
+    s.completed && s.completed_at ? h('span', {className:'step-meta'}, 'done ' + fmtAge(s.completed_at)) : null);
+}
+
+function GoalCard(props) {
+  const goal = props.goal;
+  const steps = props.steps;
+  const [open, setOpen] = React.useState(false);
+  const frac = stepFraction(steps);
+  return h('div', {className:'goal-card' + (open ? ' open' : '')},
+    h('div', {className:'goal-head', onClick:function(){ setOpen(!open); }},
+      h('div', {className:'goal-toprow'},
+        h('div', null,
+          h('div', {className:'goal-title'}, goal.title),
+          goal.description ? h('div', {className:'goal-desc'}, goal.description) : null),
+        h('div', {style:{display:'flex',alignItems:'center',gap:'8px'}},
+          h('span', {className:'badge'},
+            h('span', {className:'dot', style:{background:'#3ecf8e'}}),
+            h('span', {className: goal.status === 'completed' ? 'status-completed' : 'status-active'}, goal.status)),
+          h('span', {className:'chev' + (open ? ' open' : '')}, '▸'))),
+      h('div', {className:'progress-row'},
+        h('div', {className:'meter'}, h('div', {style:{width:frac.pct+'%', background:'#3ecf8e'}})),
+        h('span', {className:'frac'}, frac.done + '/' + frac.total + ' steps'))),
+    open ? h('div', {className:'steps-inner'},
+      steps.map(function(s){ return h(StepRow, {key:s.id, step:s, busy:props.busy, onToggle:props.onToggleStep}); })) : null);
+}
+
+function Goals(props) {
+  const [goals, setGoals] = React.useState([]);
+  const [steps, setSteps] = React.useState([]);
+  const [filter, setFilter] = React.useState('active');
+  const [msg, setMsg] = React.useState('loading...');
+  const [busy, setBusy] = React.useState(false);
+
+  async function load() {
+    const g = await supabase.from('goals').select('*').order('created_at', {ascending:false});
+    if (g.error) { setMsg('Error: ' + g.error.message); return; }
+    setGoals(g.data);
+    setMsg(g.data.length ? '' : 'No goals yet. Tell Alleah what you\'re working toward.');
+    const s = await supabase.from('goal_steps').select('*').order('position', {ascending:true});
+    if (!s.error) setSteps(s.data);
+  }
+  React.useEffect(function(){ load(); }, []);
+
+  async function toggleStep(step) {
+    setBusy(true);
+    const next = !step.completed;
+    // Optimistic local update; the server trigger owns the source of truth for goal.status,
+    // so we reload afterward instead of guessing the rollup here.
+    setSteps(function(prev){ return prev.map(function(x){ return x.id === step.id ? {...x, completed: next} : x; }); });
+    const upd = await supabase.from('goal_steps').update({completed: next}).eq('id', step.id);
+    if (upd.error) setMsg('Error: ' + upd.error.message);
+    await load();
+    setBusy(false);
+  }
+
+  const stepsByGoal = {};
+  steps.forEach(function(s){ (stepsByGoal[s.goal_id] = stepsByGoal[s.goal_id] || []).push(s); });
+  const activeGoals = goals.filter(function(g){ return g.status === 'active'; });
+  const visible = goals.filter(function(g){ return filter === 'all' ? true : g.status === 'active'; });
+  const activeFrac = stepFraction(activeGoals.flatMap(function(g){ return stepsByGoal[g.id] || []; }));
+  const completedCount = goals.filter(function(g){ return g.status === 'completed'; }).length;
+
+  return h('div', {id:'goals'},
+    msg ? h('p', {className:'muted'}, msg) : null,
+    goals.length ? h('div', {className:'card'},
+      h('div', {className:'summary-top'},
+        h('div', null, h('span', {className:'summary-num'}, activeGoals.length), ' ',
+          h('span', {className:'muted'}, activeGoals.length === 1 ? 'active goal' : 'active goals')),
+        h('span', {className:'small'}, activeFrac.pct + '% of active steps done')),
+      h('div', {className:'meter'}, h('div', {style:{width:activeFrac.pct+'%', background:'#3ecf8e'}})),
+      h('div', {className:'summary-grid'},
+        h('div', {className:'summary-stat'}, h('div', {className:'n'}, activeFrac.done), h('div', {className:'l'}, 'steps done')),
+        h('div', {className:'summary-stat'}, h('div', {className:'n'}, activeFrac.total - activeFrac.done), h('div', {className:'l'}, 'steps left')),
+        h('div', {className:'summary-stat'}, h('div', {className:'n'}, completedCount), h('div', {className:'l'}, 'completed goals')))) : null,
+    goals.length ? h('div', {className:'filter-bar'},
+      h('button', {className:'secondary' + (filter==='active'?' active':''), onClick:function(){ setFilter('active'); }}, 'Active'),
+      h('button', {className:'secondary' + (filter==='all'?' active':''), onClick:function(){ setFilter('all'); }}, 'All')) : null,
+    visible.map(function(g){
+      return h(GoalCard, {key:g.id, goal:g, steps: stepsByGoal[g.id] || [], busy:busy, onToggleStep:toggleStep});
+    }));
+}
+
+function App() {
+  const [session, setSession] = React.useState(undefined);
+  React.useEffect(() => {
+    supabase.auth.getSession().then(r => setSession(r.data.session));
+    const sub = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.data.subscription.unsubscribe();
+  }, []);
+  if (session === undefined) return h('p', {className:'muted', style:{padding:'16px'}}, 'Loading...');
+  return session ? h(Chat, {session}) : h(Auth);
+}
+createRoot(document.getElementById('root')).render(h(App));
+</script></body></html>
