@@ -537,7 +537,7 @@ render();
 </script>
 
 <!-- alleah-overlay-start -->
-<meta name="preview-rev" content="17a0a322-r3-1785440776">
+<meta name="preview-rev" content="17a0a322-r4-1785442129">
 <style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
    All classes prefixed apo- to avoid colliding with app styles. */
 
@@ -627,6 +627,29 @@ render();
 
 .apo-send:disabled { background: #a8a099; cursor: default; }
 
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
 .apo-log-toggle {
   position: fixed;
   left: 14px;
@@ -674,7 +697,7 @@ render();
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "17a0a322-a845-4ac2-9ac7-cf96c7b0731f", "revision": 3, "deploy_marker": "17a0a322-r3-1785440776", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 1, "note": "Add the goals view to the menu so it ships together with the drop down menu the staged copy already contains the goals code unlinked- add[key:\u2019goals\u2019,label:goals\u2019] to VEIWS - and update this demo so goals show in the menu too", "resolution": "resolved"}, {"revision": 2, "note": "Add the Goals view to the menu ({key:'goals', label:'Goals'} in VIEWS) so it ships with the dropdown - and replace the current card-list Goals implementation in this task's staged and demo files with the ORIGINAL Goals build (rev 0): recover it from this repo's git history at commit 196721eefd, path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html - the version with goal boxes connected by dots/lines and expandable mini-objective checklists, before the map restyle. Adapt it faithfully into each f", "resolution": "resolved"}, {"revision": 2, "note": "Trigger for the two reopened Goals pins: add {key:'goals', label:'Goals'} to VIEWS in the staged file, and add the Goals view to BOTH demo and staged - using the ORIGINAL rev-0 Goals implementation recovered from git commit 196721eefd path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html (goal boxes connected by dots/lines, expandable mini-objective checklists). Fixture-backed, no DB calls, no migrations.", "resolution": "resolved"}]}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "17a0a322-a845-4ac2-9ac7-cf96c7b0731f", "revision": 4, "deploy_marker": "17a0a322-r4-1785442129", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": [{"revision": 3, "note": "Add the goals view to the menu so it ships together with the drop down menu the staged copy already contains the goals code unlinked- add[key:\u2019goals\u2019,label:goals\u2019] to VEIWS - and update this demo so goals show in the menu too", "resolution": "resolved"}, {"revision": 3, "note": "Add the Goals view to the menu ({key:'goals', label:'Goals'} in VIEWS) so it ships with the dropdown - and replace the current card-list Goals implementation in this task's staged and demo files with the ORIGINAL Goals build (rev 0): recover it from this repo's git history at commit 196721eefd, path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html - the version with goal boxes connected by dots/lines and expandable mini-objective checklists, before the map restyle. Adapt it faithfully into each f", "resolution": "resolved"}, {"revision": 3, "note": "Trigger for the two reopened Goals pins: add {key:'goals', label:'Goals'} to VIEWS in the staged file, and add the Goals view to BOTH demo and staged - using the ORIGINAL rev-0 Goals implementation recovered from git commit 196721eefd path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html (goal boxes connected by dots/lines, expandable mini-objective checklists). Fixture-backed, no DB calls, no migrations.", "resolution": "resolved"}, {"revision": 3, "note": "In the STAGED file only: remove the demo goal fixtures - the Goals view must start EMPTY with a friendly empty state ('No goals yet - add your first') and the + New goal form. Persist goals to localStorage (key alleah_goals_v1, same pattern as the app's chat history) so added goals survive refresh. Leave the demo bundle's fixtures unchanged. No DB calls, no migrations.", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type
@@ -760,6 +783,11 @@ render();
   logToggle.className = "apo-log-toggle";
   logToggle.type = "button";
   logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
 
   var logPanel = document.createElement("div");
   logPanel.className = "apo-log apo-hidden";
@@ -981,11 +1009,50 @@ render();
     logPanel.classList.toggle("apo-hidden");
   });
 
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
   /* ---------- mount ---------- */
 
   function mount() {
     document.body.appendChild(layer);
     document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
     document.body.appendChild(logToggle);
     document.body.appendChild(logPanel);
     buildChangelog();

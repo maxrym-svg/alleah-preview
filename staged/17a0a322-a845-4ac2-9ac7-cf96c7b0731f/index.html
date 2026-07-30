@@ -88,6 +88,7 @@ const h = React.createElement;
 const SB_URL = "https://sphnmcjlxxzgovisgepo.supabase.co";
 const supabase = createClient(SB_URL, "sb_publishable_vVfIttSbf_XLWKl2xahBWA_-sXU34L0");
 const HISTORY_KEY = "alleah_chat_v1";
+const GOALS_KEY = "alleah_goals_v1";
 
 // ===== Header menu =====
 // Single source of truth for the view links shown in the header menu.
@@ -349,15 +350,16 @@ function Tasks(props) {
 }
 
 // ===== Goals tab =====
-// Restored rev-0 presentation (recovered from the original 2a9e67c9 build): goals are
-// rendered as boxes connected by a dot-and-line path (a simple roadmap), and each box
-// expands to a checklist of mini-objectives rather than a percent-complete meter.
-// Data layer note: goal + objective data is served from an in-memory fixture below,
-// not from the database - no `goals` table, no migrations, no supabase.from() calls.
-// When a real goals table + RPCs are designed, swap GOAL_FIXTURES / the local
-// mutations below for supabase.from('goals') calls following the same RLS-policy
-// pattern as folders/queries/worker_tasks. Until then this view has no schema
-// dependency and performs no live DB writes.
+// Goals render as boxes connected by a dot-and-line path (a simple roadmap), and each
+// box expands to a checklist of mini-objectives rather than a percent-complete meter.
+// Data layer note: no `goals` table, no migrations, no supabase.from() calls here.
+// Goals are persisted client-side to localStorage (key alleah_goals_v1) using the
+// same load-on-init / write-on-change pattern as the chat history (HISTORY_KEY /
+// alleah_chat_v1) above. The view starts EMPTY for every user - there are no demo
+// fixtures - and shows a friendly empty state until the user adds their first goal
+// via the inline "+ New goal" form. When a real goals table + RPCs are designed,
+// swap the localStorage load/save below for supabase.from('goals') calls following
+// the same RLS-policy pattern as folders/queries/worker_tasks.
 const DIFFICULTY = {
   easy:   {label: 'Easy',   color: '#3ecf8e'},
   medium: {label: 'Medium', color: '#58a6ff'},
@@ -366,68 +368,12 @@ const DIFFICULTY = {
 };
 const GOAL_STATUS_COLOR = {active:'#3ecf8e', completed:'#3ecf8e', paused:'#e0a458', abandoned:'#5c636e'};
 const GOALS_DAY = 86400000;
-let objSeq = 0;
-function obj(text, done) { objSeq += 1; return {id:'o' + objSeq, text, done: !!done}; }
 
-function makeGoalFixtures() {
-  const now = Date.now();
-  return [
-    {
-      id: 'g1', title: 'Run a 10K', category: 'Health', difficulty: 'medium', status: 'active',
-      description: 'Build up long-run mileage on the weekends and keep two easy runs during the week until race pace feels comfortable for the full distance.',
-      created_at: now - 40*GOALS_DAY, target_date: now + 21*GOALS_DAY,
-      objectives: [
-        obj('Build base mileage to 15mi/week', true),
-        obj('Add one tempo run per week', true),
-        obj('Complete an 8-mile long run', true),
-        obj('Taper and lock in race-week plan', false),
-      ],
-    },
-    {
-      id: 'g2', title: 'Ship personal portfolio site', category: 'Career', difficulty: 'hard', status: 'active',
-      description: 'Rebuild the portfolio with three case studies, a proper writeup of the memory-graph project, and a fast static build — no framework bloat.',
-      created_at: now - 18*GOALS_DAY, target_date: now - 2*GOALS_DAY, // overdue on purpose
-      objectives: [
-        obj('Draft case study: memory-graph project', true),
-        obj('Draft case study: task runner', false),
-        obj('Draft case study: preview pipeline', false),
-        obj('Rebuild site without a framework', true),
-        obj('Deploy to production domain', false),
-      ],
-    },
-    {
-      id: 'g3', title: 'Read 12 books this year', category: 'Learning', difficulty: 'easy', status: 'active',
-      description: 'One book a month, mix of fiction and non-fiction. Currently on book 10.',
-      created_at: now - 210*GOALS_DAY, target_date: now + 55*GOALS_DAY,
-      objectives: [
-        obj('Finish books 1 through 6', true),
-        obj('Finish books 7 through 10', true),
-        obj('Finish books 11 and 12', false),
-      ],
-    },
-    {
-      id: 'g4', title: 'Meditate daily for a month', category: 'Health', difficulty: 'easy', status: 'completed',
-      description: 'Ten minutes every morning before checking the phone. Finished the full 30 days.',
-      created_at: now - 70*GOALS_DAY, target_date: now - 40*GOALS_DAY, completed_at: now - 39*GOALS_DAY,
-      objectives: [
-        obj('Establish a morning routine', true),
-        obj('Complete week 1', true),
-        obj('Complete weeks 2-3', true),
-        obj('Complete week 4', true),
-      ],
-    },
-    {
-      id: 'g5', title: 'Train for a marathon', category: 'Health', difficulty: 'epic', status: 'paused',
-      description: 'Paused after a minor knee strain — resuming once cleared by physio. Base mileage was going well before the break.',
-      created_at: now - 65*GOALS_DAY, target_date: now + 80*GOALS_DAY,
-      objectives: [
-        obj('Base mileage to 20mi/week', true),
-        obj('Build to 30mi/week', false),
-        obj('Get physio clearance', false),
-        obj('Register for race', false),
-      ],
-    },
-  ];
+function loadGoals() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GOALS_KEY));
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
 }
 
 function fmtRelDay(ms) {
@@ -483,26 +429,79 @@ function GoalBox(props) {
           h('span', null, o.text)))) : null));
 }
 
+function NewGoalForm(props) {
+  const [title, setTitle] = React.useState('');
+  const [category, setCategory] = React.useState('');
+  const [difficulty, setDifficulty] = React.useState('medium');
+  const [targetDate, setTargetDate] = React.useState('');
+  const [description, setDescription] = React.useState('');
+
+  function submit(e) {
+    e.preventDefault();
+    const t = title.trim();
+    if (!t) return;
+    props.onAdd({
+      id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      title: t,
+      category: category.trim() || 'General',
+      difficulty,
+      status: 'active',
+      description: description.trim(),
+      created_at: Date.now(),
+      target_date: targetDate ? new Date(targetDate).getTime() : null,
+      objectives: [],
+    });
+  }
+
+  return h('form', {className:'card addform', onSubmit:submit},
+    h('input', {placeholder:'Goal title', value:title, autoFocus:true, onChange:e=>setTitle(e.target.value)}),
+    h('div', {className:'row2'},
+      h('input', {placeholder:'Category (optional)', value:category, onChange:e=>setCategory(e.target.value)}),
+      h('select', {value:difficulty, onChange:e=>setDifficulty(e.target.value)},
+        Object.keys(DIFFICULTY).map(k => h('option', {key:k, value:k}, DIFFICULTY[k].label)))),
+    h('input', {type:'date', value:targetDate, onChange:e=>setTargetDate(e.target.value)}),
+    h('textarea', {placeholder:'Description (optional)', value:description, rows:3, style:{minHeight:'70px'}, onChange:e=>setDescription(e.target.value)}),
+    h('div', {className:'row'},
+      h('button', {type:'submit'}, 'Add goal'),
+      h('button', {type:'button', className:'secondary', onClick:props.onCancel}, 'Cancel')));
+}
+
 function Goals(props) {
-  const [goals, setGoals] = React.useState(makeGoalFixtures);
+  const [goals, setGoals] = React.useState(loadGoals);
+  const [showForm, setShowForm] = React.useState(false);
+
+  React.useEffect(() => {
+    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  }, [goals]);
 
   function toggleObjective(goalId, objId) {
-    // In-memory only: no supabase.update() here by design (see NOTE above).
+    // localStorage-backed only: no supabase.update() here by design (see NOTE above).
     setGoals(gs => gs.map(g => g.id !== goalId ? g : {
       ...g, objectives: g.objectives.map(o => o.id !== objId ? o : {...o, done: !o.done}),
     }));
   }
 
+  function addGoal(g) {
+    setGoals(gs => [g, ...gs]);
+    setShowForm(false);
+  }
+
   return h('div', {id:'goals'},
-    h('div', {className:'summary'},
+    goals.length ? h('div', {className:'summary'},
       h('span', null, h('b', null, goals.length), ' goals'),
-      h('span', null, h('b', null, goals.reduce((n,g)=>n+g.objectives.filter(o=>o.done).length,0)), ' objectives done')),
-    h('div', {className:'goal-path'},
+      h('span', null, h('b', null, goals.reduce((n,g)=>n+g.objectives.filter(o=>o.done).length,0)), ' objectives done')) : null,
+    showForm
+      ? h(NewGoalForm, {onAdd:addGoal, onCancel:()=>setShowForm(false)})
+      : h('button', {type:'button', className:'newgoalbtn', onClick:()=>setShowForm(true)}, '+ New goal'),
+    goals.length === 0 && !showForm
+      ? h('p', {className:'muted', style:{padding:'16px 2px'}}, 'No goals yet - add your first.')
+      : null,
+    goals.length ? h('div', {className:'goal-path', style:{marginTop:'10px'}},
       goals.map((g, i) => h('div', {className:'goal-row', key:g.id},
         h('div', {className:'goal-connector'},
           h('span', {className:'goal-node-dot', style:{color: GOAL_STATUS_COLOR[g.status]}}),
           i < goals.length - 1 ? h('span', {className:'goal-node-line'}) : null),
-        h(GoalBox, {g, onToggle: toggleObjective})))));
+        h(GoalBox, {g, onToggle: toggleObjective})))) : null);
 }
 
 function App() {
