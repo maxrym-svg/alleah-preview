@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah — Goals (preview)</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px}
+h1{font-size:18px;margin:0}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;border-radius:8px}
+button:disabled{opacity:.5}
+input,select,textarea{width:100%;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:10px;padding:12px;font:inherit}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.muted{color:#9aa3ad;font-size:14px}
+#goals{flex:1;overflow-y:auto;padding:8px 14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:4px 0}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
+.meter>div{height:100%;border-radius:4px}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.summary{display:flex;gap:14px;flex-wrap:wrap;padding:2px 2px 10px;color:#9aa3ad;font-size:12px}
+.summary b{color:#e6e6e6}
+.goal-desc{white-space:pre-wrap;background:#0f1115;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;font-size:13.5px;color:#c7ccd3}
+.addform{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.addform .row2{display:flex;gap:8px}
+.addform .row2>*{flex:1}
+.newgoalbtn{width:100%;text-align:left;background:#1a1d23;color:#9aa3ad;border:1px dashed #2c313a}
+.goal-path{display:flex;flex-direction:column}
+.goal-row{display:flex;gap:10px}
+.goal-connector{display:flex;flex-direction:column;align-items:center;width:18px;flex:none}
+.goal-node-dot{width:14px;height:14px;border-radius:50%;flex:none;margin-top:14px;box-shadow:0 0 0 3px #0f1115,0 0 0 4.5px currentColor}
+.goal-node-line{width:2px;flex:1;min-height:22px;background:#2c313a;margin:4px 0}
+.goal-box{flex:1;min-width:0;background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer}
+.goal-box-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.goal-obj-count{font-size:12px;color:#9aa3ad}
+.goal-checklist{margin-top:10px;padding-top:10px;border-top:1px solid #2c313a;display:flex;flex-direction:column;gap:2px}
+.goal-obj{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.goal-obj input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#3ecf8e;cursor:pointer}
+.goal-obj span{font-size:14px}
+.goal-obj.done span{text-decoration:line-through;color:#9aa3ad}
+.previewbar{background:#1a1d23;border-bottom:1px solid #2c313a;color:#9aa3ad;font-size:12px;text-align:center;padding:6px 10px}
+</style></head><body>
+<div id="root">
+  <div class="previewbar">Static preview — Goals tab (fixed due-date handling) · demo data only, nothing leaves this page</div>
+  <header>
+    <h1>Alleah</h1>
+    <span class="badge"><span class="dot" style="background:#3ecf8e"></span><span style="color:#3ecf8e">Goals</span></span>
+  </header>
+  <div id="goals"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  // ===== Fixture / persistence layer =====
+  // Mirrors the real app's client-side-only Goals storage: no backend, no network
+  // calls. Data lives in localStorage under GOALS_KEY, loaded on init and written
+  // on every change - exactly the pattern used in the live app. This preview seeds
+  // a few generic synthetic goals the first time it runs so the feature can be seen
+  // without manual setup; the live app itself starts empty for every real user.
+  var GOALS_KEY = "alleah_goals_v1_preview";
+  var GOALS_DAY = 86400000;
+
+  var DIFFICULTY = {
+    easy:   {label: "Easy",   color: "#3ecf8e"},
+    medium: {label: "Medium", color: "#58a6ff"},
+    hard:   {label: "Hard",   color: "#e0a458"},
+    epic:   {label: "Epic",   color: "#d68fff"}
+  };
+  var GOAL_STATUS_COLOR = {active:"#3ecf8e", completed:"#3ecf8e", paused:"#e0a458", abandoned:"#5c636e"};
+
+  function daysAgo(n) { return Date.now() - n * GOALS_DAY; }
+  function daysFromNow(n) { return Date.now() + n * GOALS_DAY; }
+
+  function demoFixtures() {
+    return [
+      {
+        id: "g1", title: "Ship the onboarding redesign", category: "Work", difficulty: "hard",
+        status: "active", description: "Get the new user onboarding flow live end to end, from signup to first value moment.",
+        created_at: daysAgo(12), target_date: daysFromNow(9),
+        objectives: [
+          {id:"o1", text:"Wireframe the new flow", done:true},
+          {id:"o2", text:"Build signup screen", done:true},
+          {id:"o3", text:"Build empty-state screen", done:false},
+          {id:"o4", text:"Usability test with 5 people", done:false}
+        ]
+      },
+      {
+        id: "g2", title: "Run a 10k", category: "Fitness", difficulty: "medium",
+        status: "active", description: "Train up from a 5k base and finish a local 10k race.",
+        created_at: daysAgo(40), target_date: daysAgo(3),
+        objectives: [
+          {id:"o1", text:"Build to 8k long run", done:true},
+          {id:"o2", text:"Register for a race", done:true},
+          {id:"o3", text:"Taper week", done:false}
+        ]
+      },
+      {
+        id: "g3", title: "Read 12 books this year", category: "Personal", difficulty: "easy",
+        status: "completed", description: "One book a month, any genre.",
+        created_at: daysAgo(370), target_date: daysAgo(6), completed_at: daysAgo(6),
+        objectives: [
+          {id:"o1", text:"Finish book 11", done:true},
+          {id:"o2", text:"Finish book 12", done:true}
+        ]
+      },
+      {
+        id: "g4", title: "Learn conversational Spanish", category: "Learning", difficulty: "epic",
+        status: "paused", description: "Get to a level where I can hold a casual conversation while travelling.",
+        created_at: daysAgo(90), target_date: null,
+        objectives: [
+          {id:"o1", text:"Finish beginner course", done:true},
+          {id:"o2", text:"Practice 3x/week", done:false},
+          {id:"o3", text:"Have a 10 minute conversation", done:false}
+        ]
+      }
+    ];
+  }
+
+  function loadGoals() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(GOALS_KEY));
+      if (Array.isArray(raw)) return raw;
+    } catch (e) {}
+    var seed = demoFixtures();
+    localStorage.setItem(GOALS_KEY, JSON.stringify(seed));
+    return seed;
+  }
+
+  function saveGoals(goals) {
+    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  }
+
+  // ===== THE FIX =====
+  // Bug: due dates were registering 20000+ days in the past instead of the date the
+  // user entered. Root cause was date values from <input type="date"> (a plain
+  // "YYYY-MM-DD" string) being coerced into a number instead of properly parsed into
+  // a calendar date - e.g. Number("2025-06-15") / parseInt("2025-06-15") reads only
+  // the leading digits ("2025") and yields a millisecond timestamp just a couple of
+  // seconds after the Unix epoch (1970), which is ~20000+ days before today. A second,
+  // related bug: when no due date was chosen at all, the missing value (null) got
+  // compared/subtracted as if it were 0 (also epoch), so "no due date" also rendered
+  // as ~20000+ days in the past.
+  //
+  // Fix: parse the y/m/d components explicitly and construct a real local Date from
+  // them (never coerce the string to a number), and treat "no due date" as genuinely
+  // absent everywhere it's displayed or compared, instead of falling through to 0/epoch.
+  function parseDateInputToMs(dateStr) {
+    if (!dateStr) return null;
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (!m) return null;
+    var year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+    return new Date(year, month - 1, day).getTime();
+  }
+
+  function fmtRelDay(ms) {
+    var days = Math.round((ms - Date.now()) / GOALS_DAY);
+    if (days === 0) return "today";
+    if (days > 0) return "in " + days + "d";
+    return Math.abs(days) + "d ago";
+  }
+  function fmtAgeShort(ms) {
+    var days = Math.round((Date.now() - ms) / GOALS_DAY);
+    if (days < 1) return "today";
+    if (days < 30) return days + "d ago";
+    if (days < 365) return Math.round(days / 30) + "mo ago";
+    return Math.round(days / 365) + "y ago";
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  // ===== State =====
+  var state = {
+    goals: loadGoals(),
+    showForm: false,
+    openId: null
+  };
+
+  function setState(patch) {
+    Object.assign(state, patch);
+    render();
+  }
+
+  function addGoal(g) {
+    state.goals = [g].concat(state.goals);
+    saveGoals(state.goals);
+    state.showForm = false;
+    render();
+  }
+
+  function toggleObjective(goalId, objId) {
+    state.goals = state.goals.map(function (g) {
+      if (g.id !== goalId) return g;
+      return Object.assign({}, g, {
+        objectives: g.objectives.map(function (o) {
+          return o.id !== objId ? o : Object.assign({}, o, {done: !o.done});
+        })
+      });
+    });
+    saveGoals(state.goals);
+    render();
+  }
+
+  // ===== Rendering =====
+  var root = document.getElementById("goals");
+
+  function goalBoxHtml(g, isOpen) {
+    var diff = DIFFICULTY[g.difficulty];
+    var color = GOAL_STATUS_COLOR[g.status];
+    var hasDate = g.target_date != null;
+    var overdue = g.status === "active" && hasDate && g.target_date < Date.now();
+    var total = g.objectives.length;
+    var done = g.objectives.filter(function (o) { return o.done; }).length;
+    var ratio = total ? done / total : 0;
+    var meterColor = overdue ? "#ff7b72" : color;
+    var dateLine = "";
+    if (g.status === "completed") dateLine = "completed " + fmtAgeShort(g.completed_at);
+    else if (hasDate && g.status === "active") dateLine = (overdue ? "was due " : "due ") + fmtRelDay(g.target_date);
+    else if (hasDate) dateLine = "target " + fmtRelDay(g.target_date);
+    else dateLine = "no due date";
+
+    var checklist = "";
+    if (isOpen) {
+      checklist = '<div class="goal-desc">' + esc(g.description || "") + '</div>' +
+        '<div class="goal-checklist">' +
+        g.objectives.map(function (o) {
+          return '<label class="goal-obj' + (o.done ? " done" : "") + '" data-toggle-goal="' + g.id + '" data-toggle-obj="' + o.id + '">' +
+            '<input type="checkbox" ' + (o.done ? "checked" : "") + '>' +
+            '<span>' + esc(o.text) + '</span></label>';
+        }).join("") +
+        '</div>';
+    }
+
+    return (
+      '<div class="goal-box" data-open-goal="' + g.id + '">' +
+        '<div class="goal-box-head">' +
+          '<p style="font-size:15px;font-weight:700;margin:0 0 2px">' + esc(g.title) + '</p>' +
+          '<span class="pill" style="background:' + diff.color + '22;color:' + diff.color + ';border:1px solid ' + diff.color + '55">' + diff.label + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span class="badge"><span class="dot' + (g.status === "active" ? " pulse" : "") + '" style="background:' + color + '"></span><span style="color:' + color + '">' + g.status + '</span></span>' +
+          '<span class="small">' + esc(g.category) + '</span>' +
+          '<span class="small">·</span>' +
+          '<span class="small" style="color:' + (overdue ? "#ff7b72" : "#9aa3ad") + '">' + dateLine + '</span>' +
+        '</div>' +
+        '<div class="meter"><div style="width:' + (ratio * 100) + '%;background:' + meterColor + '"></div></div>' +
+        '<div class="goal-obj-count">' + done + ' / ' + total + ' mini-objectives</div>' +
+        checklist +
+      '</div>'
+    );
+  }
+
+  function formHtml() {
+    return (
+      '<form class="card addform" id="new-goal-form">' +
+        '<input placeholder="Goal title" id="ng-title" autofocus required>' +
+        '<div class="row2">' +
+          '<input placeholder="Category (optional)" id="ng-category">' +
+          '<select id="ng-difficulty">' +
+            Object.keys(DIFFICULTY).map(function (k) {
+              return '<option value="' + k + '"' + (k === "medium" ? " selected" : "") + '>' + DIFFICULTY[k].label + '</option>';
+            }).join("") +
+          '</select>' +
+        '</div>' +
+        '<input type="date" id="ng-date">' +
+        '<textarea placeholder="Description (optional)" id="ng-desc" rows="3" style="min-height:70px"></textarea>' +
+        '<div class="row">' +
+          '<button type="submit">Add goal</button>' +
+          '<button type="button" class="secondary" id="ng-cancel">Cancel</button>' +
+        '</div>' +
+      '</form>'
+    );
+  }
+
+  function render() {
+    var goals = state.goals;
+    var html = "";
+
+    if (goals.length) {
+      var objDone = goals.reduce(function (n, g) { return n + g.objectives.filter(function (o) { return o.done; }).length; }, 0);
+      html += '<div class="summary"><span><b>' + goals.length + '</b> goals</span><span><b>' + objDone + '</b> objectives done</span></div>';
+    }
+
+    if (state.showForm) {
+      html += formHtml();
+    } else {
+      html += '<button type="button" class="newgoalbtn" id="show-form-btn">+ New goal</button>';
+    }
+
+    if (!goals.length && !state.showForm) {
+      html += '<p class="muted" style="padding:16px 2px">No goals yet - add your first.</p>';
+    }
+
+    if (goals.length) {
+      html += '<div class="goal-path" style="margin-top:10px">';
+      goals.forEach(function (g, i) {
+        html += '<div class="goal-row">' +
+          '<div class="goal-connector">' +
+            '<span class="goal-node-dot" style="color:' + GOAL_STATUS_COLOR[g.status] + '"></span>' +
+            (i < goals.length - 1 ? '<span class="goal-node-line"></span>' : '') +
+          '</div>' +
+          goalBoxHtml(g, state.openId === g.id) +
+        '</div>';
+      });
+      html += '</div>';
+    }
+
+    root.innerHTML = html;
+    wireEvents();
+  }
+
+  function wireEvents() {
+    var showBtn = document.getElementById("show-form-btn");
+    if (showBtn) showBtn.addEventListener("click", function () { setState({showForm: true}); });
+
+    var form = document.getElementById("new-goal-form");
+    if (form) {
+      var cancelBtn = document.getElementById("ng-cancel");
+      cancelBtn.addEventListener("click", function () { setState({showForm: false}); });
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var title = document.getElementById("ng-title").value.trim();
+        if (!title) return;
+        var category = document.getElementById("ng-category").value.trim();
+        var difficulty = document.getElementById("ng-difficulty").value;
+        var dateStr = document.getElementById("ng-date").value;
+        var description = document.getElementById("ng-desc").value.trim();
+        addGoal({
+          id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          title: title,
+          category: category || "General",
+          difficulty: difficulty,
+          status: "active",
+          description: description,
+          created_at: Date.now(),
+          target_date: parseDateInputToMs(dateStr),
+          objectives: []
+        });
+      });
+    }
+
+    document.querySelectorAll("[data-open-goal]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var id = el.getAttribute("data-open-goal");
+        setState({openId: state.openId === id ? null : id});
+      });
+    });
+
+    document.querySelectorAll("[data-toggle-goal]").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        toggleObjective(el.getAttribute("data-toggle-goal"), el.getAttribute("data-toggle-obj"));
+      });
+    });
+  }
+
+  render();
+})();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="4d3b0728-r0-1785448627">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "4d3b0728-8f42-4726-97f2-404c7234b42c", "revision": 0, "deploy_marker": "4d3b0728-r0-1785448627", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
