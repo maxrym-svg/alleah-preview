@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah - Goals preview</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px}
+h1{font-size:18px;margin:0}
+.hdr-badge{font-size:12px;color:#9aa3ad;border:1px solid #2c313a;border-radius:999px;padding:3px 11px}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;height:44px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;height:auto;border-radius:8px}
+button:disabled{opacity:.5}
+input,select,textarea{width:100%;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:10px;padding:12px;font:inherit}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.muted{color:#9aa3ad;font-size:14px}
+.err{color:#ff7b72;font-size:14px}
+#goals{flex:1;overflow-y:auto;padding:8px 14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.meter{height:8px;border-radius:4px;background:#2c313a;overflow:hidden;margin:4px 0}
+.meter>div{height:100%;border-radius:4px}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.summary{display:flex;gap:14px;flex-wrap:wrap;padding:2px 2px 10px;color:#9aa3ad;font-size:12px}
+.summary b{color:#e6e6e6}
+.goal-desc{white-space:pre-wrap;background:#0f1115;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;font-size:13.5px;color:#c7ccd3}
+.addform{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.addform .row2{display:flex;gap:8px}
+.addform .row2>*{flex:1}
+.addform textarea{min-height:70px;resize:vertical}
+.newgoalbtn{width:100%;text-align:left;background:#1a1d23;color:#9aa3ad;border:1px dashed #2c313a}
+.goal-path{display:flex;flex-direction:column}
+.goal-row{display:flex;gap:10px}
+.goal-connector{display:flex;flex-direction:column;align-items:center;width:18px;flex:none}
+.goal-node-dot{width:14px;height:14px;border-radius:50%;flex:none;margin-top:14px;box-shadow:0 0 0 3px #0f1115,0 0 0 4.5px currentColor}
+.goal-node-line{width:2px;flex:1;min-height:22px;background:#2c313a;margin:4px 0}
+.goal-box{flex:1;min-width:0;background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer}
+.goal-box-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.goal-obj-count{font-size:12px;color:#9aa3ad}
+.goal-checklist{margin-top:10px;padding-top:10px;border-top:1px solid #2c313a;display:flex;flex-direction:column;gap:2px}
+.goal-obj{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.goal-obj input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#3ecf8e;cursor:pointer}
+.goal-obj span{font-size:14px}
+.goal-obj.done span{text-decoration:line-through;color:#9aa3ad}
+.goal-generate{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.goal-generate button{width:100%}
+.goal-generate .hint{font-size:11px;color:#5c636e}
+</style></head><body>
+<div id="root">
+  <header>
+    <h1>Alleah</h1>
+    <span class="hdr-badge">Goals · preview</span>
+  </header>
+  <div id="goals"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+  // ===== Sealed static preview =====
+  // No Supabase client, no auth, no fetch/XHR of any kind. "Auto-generate
+  // mini-objectives" is faked entirely with a hardcoded fixture: clicking the
+  // button picks a fixed, plausible checklist (chosen by simple keyword match
+  // against the goal's title/category, purely client-side) and appends it -
+  // no outbound request ever fires. Everything else - goal boxes, the
+  // roadmap path, checklist toggling, localStorage persistence - mirrors the
+  // real app's Goals tab.
+  const GOALS_KEY = "alleah_goals_v1";
+  const GOALS_DAY = 86400000;
+
+  const DIFFICULTY = {
+    easy:   {label: "Easy",   color: "#3ecf8e"},
+    medium: {label: "Medium", color: "#58a6ff"},
+    hard:   {label: "Hard",   color: "#e0a458"},
+    epic:   {label: "Epic",   color: "#d68fff"},
+  };
+  const GOAL_STATUS_COLOR = {active:"#3ecf8e", completed:"#3ecf8e", paused:"#e0a458", abandoned:"#5c636e"};
+
+  // ---- Hardcoded fixture bank for "auto-generate mini-objectives" ----
+  // Picked by keyword match against title+category; falls back to a generic
+  // set. This is the entire "generation" - a fixed lookup, nothing computed
+  // from any model or network response.
+  const FIXTURES = {
+    fitness: ["Pick a training plan and rest days", "Buy proper shoes/gear", "Do a baseline timed trial", "Run 3x/week for 4 weeks", "Add one longer weekend session", "Do a dress-rehearsal at full distance"],
+    learning: ["Pick a course or textbook", "Set a weekly study block", "Learn the first 100 core words/concepts", "Practice 15 min a day", "Do a mock test or conversation", "Review weak spots from mistakes"],
+    finance: ["Set the target amount and deadline", "Open a separate savings account", "Set an automatic weekly transfer", "Cut one recurring expense", "Check progress monthly", "Hit the halfway mark"],
+    career: ["Update resume and portfolio", "List 10 target roles or companies", "Ask 2 people for a referral or intro", "Apply to 5 roles", "Do a mock interview", "Follow up on open applications"],
+    creative: ["Sketch the rough outline or concept", "Block out time weekly to work on it", "Finish a first rough draft/version", "Get feedback from someone else", "Revise based on feedback", "Ship or share the finished piece"],
+    default: ["Break the goal into a first small step", "Block time on the calendar for it", "Do the first real session", "Check in on progress weekly", "Handle the hardest part first", "Do a final review before calling it done"],
+  };
+  function fixtureFor(goal) {
+    const t = ((goal.title || "") + " " + (goal.category || "")).toLowerCase();
+    if (/run|gym|workout|marathon|fitness|health|10k|5k|weight/.test(t)) return FIXTURES.fitness;
+    if (/read|book|learn|course|study|language|exam|certif/.test(t)) return FIXTURES.learning;
+    if (/save|budget|money|finance|invest|debt|laptop|fund/.test(t)) return FIXTURES.finance;
+    if (/career|job|resume|interview|promotion|work/.test(t)) return FIXTURES.career;
+    if (/write|paint|design|music|album|novel|art|creative/.test(t)) return FIXTURES.creative;
+    return FIXTURES.default;
+  }
+
+  // ---- localStorage load/save (same key + shape as the real app) ----
+  function loadGoals() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(GOALS_KEY));
+      return Array.isArray(raw) ? raw : null;
+    } catch { return null; }
+  }
+  function saveGoals() { localStorage.setItem(GOALS_KEY, JSON.stringify(state.goals)); }
+
+  function seedGoals() {
+    const now = Date.now();
+    return [
+      {
+        id: "g1", title: "Run a 10K", category: "Fitness", difficulty: "medium", status: "active",
+        description: "Build up from casual jogging to a full 10K without stopping.",
+        created_at: now - 9 * GOALS_DAY, target_date: now + 40 * GOALS_DAY,
+        objectives: [
+          {id:"o1", text:"Pick a training plan and rest days", done:true},
+          {id:"o2", text:"Buy proper shoes/gear", done:true},
+          {id:"o3", text:"Do a baseline timed trial", done:false},
+        ],
+      },
+      {
+        id: "g2", title: "Learn conversational Spanish", category: "Learning", difficulty: "hard", status: "active",
+        description: "Get comfortable holding a basic conversation before the trip in the spring.",
+        created_at: now - 30 * GOALS_DAY, target_date: now + 70 * GOALS_DAY,
+        objectives: [
+          {id:"o4", text:"Pick a course or textbook", done:true},
+          {id:"o5", text:"Set a weekly study block", done:false},
+        ],
+      },
+      {
+        id: "g3", title: "Save for a new laptop", category: "Finance", difficulty: "easy", status: "completed",
+        description: "Put aside enough for a work laptop upgrade without touching savings.",
+        created_at: now - 120 * GOALS_DAY, target_date: now - 10 * GOALS_DAY, completed_at: now - 10 * GOALS_DAY,
+        objectives: [
+          {id:"o6", text:"Set the target amount and deadline", done:true},
+          {id:"o7", text:"Open a separate savings account", done:true},
+          {id:"o8", text:"Set an automatic weekly transfer", done:true},
+        ],
+      },
+    ];
+  }
+
+  const existing = loadGoals();
+  const state = {
+    goals: existing !== null ? existing : seedGoals(),
+    showForm: false,
+    open: new Set(),
+  };
+  if (existing === null) saveGoals();
+
+  function parseDateInputToMs(dateStr) {
+    if (!dateStr) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (!m) return null;
+    const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+    return new Date(year, month - 1, day).getTime();
+  }
+  function fmtRelDay(ms) {
+    const days = Math.round((ms - Date.now()) / GOALS_DAY);
+    if (days === 0) return "today";
+    if (days > 0) return "in " + days + "d";
+    return Math.abs(days) + "d ago";
+  }
+  function fmtAgeShort(ms) {
+    const days = Math.round((Date.now() - ms) / GOALS_DAY);
+    if (days < 1) return "today";
+    if (days < 30) return days + "d ago";
+    if (days < 365) return Math.round(days / 30) + "mo ago";
+    return Math.round(days / 365) + "y ago";
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  }
+  function newObjectiveId(i) {
+    return "o" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + i;
+  }
+
+  function goalBoxHtml(g, i, total) {
+    const diff = DIFFICULTY[g.difficulty];
+    const color = GOAL_STATUS_COLOR[g.status];
+    const overdue = g.status === "active" && g.target_date != null && g.target_date < Date.now();
+    const objTotal = g.objectives.length;
+    const done = g.objectives.filter(o => o.done).length;
+    const ratio = objTotal ? done / objTotal : 0;
+    const meterColor = overdue ? "#ff7b72" : color;
+    let dateLine;
+    if (g.status === "completed") dateLine = "completed " + fmtAgeShort(g.completed_at);
+    else if (g.status === "active") dateLine = (overdue ? "was due " : "due ") + fmtRelDay(g.target_date);
+    else dateLine = "target " + fmtRelDay(g.target_date);
+    const open = state.open.has(g.id);
+    return (
+      '<div class="goal-row">' +
+        '<div class="goal-connector">' +
+          '<span class="goal-node-dot" style="color:' + color + '"></span>' +
+          (i < total - 1 ? '<span class="goal-node-line"></span>' : '') +
+        '</div>' +
+        '<div class="goal-box" data-goal="' + g.id + '" data-action="toggle-open">' +
+          '<div class="goal-box-head">' +
+            '<p style="font-size:15px;font-weight:700;margin:0 0 2px">' + esc(g.title) + '</p>' +
+            '<span class="pill" style="background:' + diff.color + '22;color:' + diff.color + ';border:1px solid ' + diff.color + '55">' + diff.label + '</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<span class="badge"><span class="dot' + (g.status === "active" ? " pulse" : "") + '" style="background:' + color + '"></span><span style="color:' + color + '">' + g.status + '</span></span>' +
+            '<span class="small">' + esc(g.category) + '</span>' +
+            (g.target_date != null ? '<span class="small">·</span><span class="small" style="color:' + (overdue ? "#ff7b72" : "#9aa3ad") + '">' + dateLine + '</span>' : '') +
+          '</div>' +
+          '<div class="meter"><div style="width:' + (ratio * 100) + '%;background:' + meterColor + '"></div></div>' +
+          '<div class="goal-obj-count">' + done + ' / ' + objTotal + ' mini-objectives</div>' +
+          (open ? (
+            '<div>' +
+              '<div class="goal-desc">' + esc(g.description) + '</div>' +
+              '<div class="goal-checklist">' +
+                g.objectives.map(o =>
+                  '<label class="goal-obj' + (o.done ? " done" : "") + '" data-action="stop">' +
+                    '<input type="checkbox" ' + (o.done ? "checked" : "") + ' data-action="toggle-obj" data-goal="' + g.id + '" data-obj="' + o.id + '">' +
+                    '<span>' + esc(o.text) + '</span>' +
+                  '</label>').join("") +
+              '</div>' +
+              '<div class="goal-generate" data-action="stop">' +
+                '<button type="button" class="secondary" data-action="generate" data-goal="' + g.id + '">✨ Auto-generate mini-objectives</button>' +
+                '<span class="hint">Preview fixture - no network call, populates instantly.</span>' +
+              '</div>' +
+            '</div>'
+          ) : "") +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function render() {
+    const goals = state.goals;
+    const doneCount = goals.reduce((n, g) => n + g.objectives.filter(o => o.done).length, 0);
+    let out = "";
+    if (goals.length) {
+      out += '<div class="summary"><span><b>' + goals.length + '</b> goals</span><span><b>' + doneCount + '</b> objectives done</span></div>';
+    }
+    out += state.showForm ? formHtml() : '<button type="button" class="newgoalbtn" data-action="show-form">+ New goal</button>';
+    if (!goals.length && !state.showForm) {
+      out += '<p class="muted" style="padding:16px 2px">No goals yet - add your first.</p>';
+    }
+    if (goals.length) {
+      out += '<div class="goal-path" style="margin-top:10px">' + goals.map((g, i) => goalBoxHtml(g, i, goals.length)).join("") + '</div>';
+    }
+    document.getElementById("goals").innerHTML = out;
+  }
+
+  function formHtml() {
+    return (
+      '<form class="card addform" id="newgoal-form">' +
+        '<input placeholder="Goal title" name="title" autofocus>' +
+        '<div class="row2">' +
+          '<input placeholder="Category (optional)" name="category">' +
+          '<select name="difficulty">' +
+            Object.keys(DIFFICULTY).map(k => '<option value="' + k + '"' + (k === "medium" ? " selected" : "") + '>' + DIFFICULTY[k].label + '</option>').join("") +
+          '</select>' +
+        '</div>' +
+        '<input type="date" name="target_date">' +
+        '<textarea name="description" rows="3" placeholder="Description (optional)"></textarea>' +
+        '<div class="row">' +
+          '<button type="submit">Add goal</button>' +
+          '<button type="button" class="secondary" data-action="cancel-form">Cancel</button>' +
+        '</div>' +
+      '</form>'
+    );
+  }
+
+  function toggleObjective(goalId, objId) {
+    const g = state.goals.find(g => g.id === goalId);
+    if (!g) return;
+    const o = g.objectives.find(o => o.id === objId);
+    if (!o) return;
+    o.done = !o.done;
+    saveGoals();
+    render();
+  }
+
+  // The entire "auto-generate" feature: a synchronous, hardcoded fixture lookup.
+  // No fetch/XHR, no timers pretending to be a network round trip - it is what
+  // it looks like: instant, local, and 100% deterministic.
+  function generateObjectives(goalId) {
+    const g = state.goals.find(g => g.id === goalId);
+    if (!g) return;
+    const existingText = new Set(g.objectives.map(o => o.text));
+    const fresh = fixtureFor(g).filter(t => !existingText.has(t));
+    if (!fresh.length) return;
+    fresh.forEach((text, i) => g.objectives.push({id: newObjectiveId(i), text, done: false}));
+    saveGoals();
+    render();
+  }
+
+  function addGoal(fd) {
+    const title = (fd.get("title") || "").trim();
+    if (!title) return;
+    state.goals.unshift({
+      id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      title,
+      category: (fd.get("category") || "").trim() || "General",
+      difficulty: fd.get("difficulty") || "medium",
+      status: "active",
+      description: (fd.get("description") || "").trim(),
+      created_at: Date.now(),
+      target_date: parseDateInputToMs(fd.get("target_date")),
+      objectives: [],
+    });
+    state.showForm = false;
+    saveGoals();
+    render();
+  }
+
+  document.getElementById("goals").addEventListener("click", function (e) {
+    const el = e.target.closest("[data-action]");
+    if (!el) return;
+    const action = el.getAttribute("data-action");
+    if (action === "stop") { e.stopPropagation(); return; }
+    if (action === "show-form") { state.showForm = true; render(); }
+    else if (action === "cancel-form") { state.showForm = false; render(); }
+    else if (action === "toggle-open") {
+      const id = el.getAttribute("data-goal");
+      if (state.open.has(id)) state.open.delete(id); else state.open.add(id);
+      render();
+    } else if (action === "generate") {
+      e.stopPropagation();
+      generateObjectives(el.getAttribute("data-goal"));
+    }
+  });
+  document.getElementById("goals").addEventListener("change", function (e) {
+    const el = e.target.closest("[data-action='toggle-obj']");
+    if (!el) return;
+    toggleObjective(el.getAttribute("data-goal"), el.getAttribute("data-obj"));
+  });
+  document.getElementById("goals").addEventListener("submit", function (e) {
+    if (e.target && e.target.id === "newgoal-form") {
+      e.preventDefault();
+      addGoal(new FormData(e.target));
+    }
+  });
+
+  render();
+})();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="2e479377-r0-1785450351">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "2e479377-90f7-49eb-aafe-2aaaf2bc4891", "revision": 0, "deploy_marker": "2e479377-r0-1785450351", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
