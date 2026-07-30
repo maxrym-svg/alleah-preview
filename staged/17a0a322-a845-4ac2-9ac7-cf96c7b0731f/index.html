@@ -54,6 +54,19 @@ input,select{width:100%;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313
 .addform .row2{display:flex;gap:8px}
 .addform .row2>*{flex:1}
 .newgoalbtn{width:100%;text-align:left;background:#1a1d23;color:#9aa3ad;border:1px dashed #2c313a}
+.goal-path{display:flex;flex-direction:column}
+.goal-row{display:flex;gap:10px}
+.goal-connector{display:flex;flex-direction:column;align-items:center;width:18px;flex:none}
+.goal-node-dot{width:14px;height:14px;border-radius:50%;flex:none;margin-top:14px;box-shadow:0 0 0 3px #0f1115,0 0 0 4.5px currentColor}
+.goal-node-line{width:2px;flex:1;min-height:22px;background:#2c313a;margin:4px 0}
+.goal-box{flex:1;min-width:0;background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer}
+.goal-box-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.goal-obj-count{font-size:12px;color:#9aa3ad}
+.goal-checklist{margin-top:10px;padding-top:10px;border-top:1px solid #2c313a;display:flex;flex-direction:column;gap:2px}
+.goal-obj{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.goal-obj input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#3ecf8e;cursor:pointer}
+.goal-obj span{font-size:14px}
+.goal-obj.done span{text-decoration:line-through;color:#9aa3ad}
 .menu-wrap{position:relative}
 .menu-btn{width:46px;height:46px;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:12px;padding:0;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .menu-btn:active{background:#2c313a}
@@ -83,6 +96,7 @@ const HISTORY_KEY = "alleah_chat_v1";
 const VIEWS = [
   {key:'chat', label:'Chat'},
   {key:'tasks', label:'Tasks'},
+  {key:'goals', label:'Goals'},
 ];
 
 function HeaderMenu(props) {
@@ -197,6 +211,7 @@ function Chat(props) {
         onSignOut: () => supabase.auth.signOut(),
       })),
     view === 'tasks' ? h(Tasks, {session: props.session})
+    : view === 'goals' ? h(Goals, null)
     : h(React.Fragment, null,
     h('div', {id:'thread'},
       messages.length === 0 ? h('p', {className:'muted', style:{padding:'0 6px'}}, 'Talk to me. What you tell me about what you know gets remembered - automatically.') : null,
@@ -334,18 +349,15 @@ function Tasks(props) {
 }
 
 // ===== Goals tab =====
-// NOTE (data layer, per revision 2a9e67c9): goal + difficulty data is served from an
-// in-memory fixture below, not from the database. The earlier version of this feature
-// staged two migrations (006_goals.sql, 007_goal_difficulty.sql) that created a real
-// `goals` table; those are removed. When a real goals table + RPCs are designed and
-// migrated, swap GOAL_FIXTURES / the local mutations below for supabase.from('goals')
-// calls following the same RLS-policy pattern as folders/queries/worker_tasks. Until
-// then this view has no schema dependency and performs no live DB writes.
-//
-// NOTE (nav, header-menu revision): this view is not currently reachable from the
-// header menu - only Chat and Tasks are listed in VIEWS above. Add
-// {key:'goals', label:'Goals'} to VIEWS to relink it once it's ready to ship again;
-// no other wiring changes are needed.
+// Restored rev-0 presentation (recovered from the original 2a9e67c9 build): goals are
+// rendered as boxes connected by a dot-and-line path (a simple roadmap), and each box
+// expands to a checklist of mini-objectives rather than a percent-complete meter.
+// Data layer note: goal + objective data is served from an in-memory fixture below,
+// not from the database - no `goals` table, no migrations, no supabase.from() calls.
+// When a real goals table + RPCs are designed, swap GOAL_FIXTURES / the local
+// mutations below for supabase.from('goals') calls following the same RLS-policy
+// pattern as folders/queries/worker_tasks. Until then this view has no schema
+// dependency and performs no live DB writes.
 const DIFFICULTY = {
   easy:   {label: 'Easy',   color: '#3ecf8e'},
   medium: {label: 'Medium', color: '#58a6ff'},
@@ -354,6 +366,8 @@ const DIFFICULTY = {
 };
 const GOAL_STATUS_COLOR = {active:'#3ecf8e', completed:'#3ecf8e', paused:'#e0a458', abandoned:'#5c636e'};
 const GOALS_DAY = 86400000;
+let objSeq = 0;
+function obj(text, done) { objSeq += 1; return {id:'o' + objSeq, text, done: !!done}; }
 
 function makeGoalFixtures() {
   const now = Date.now();
@@ -361,50 +375,57 @@ function makeGoalFixtures() {
     {
       id: 'g1', title: 'Run a 10K', category: 'Health', difficulty: 'medium', status: 'active',
       description: 'Build up long-run mileage on the weekends and keep two easy runs during the week until race pace feels comfortable for the full distance.',
-      progress_pct: 62, streak_days: 14,
       created_at: now - 40*GOALS_DAY, target_date: now + 21*GOALS_DAY,
+      objectives: [
+        obj('Build base mileage to 15mi/week', true),
+        obj('Add one tempo run per week', true),
+        obj('Complete an 8-mile long run', true),
+        obj('Taper and lock in race-week plan', false),
+      ],
     },
     {
       id: 'g2', title: 'Ship personal portfolio site', category: 'Career', difficulty: 'hard', status: 'active',
       description: 'Rebuild the portfolio with three case studies, a proper writeup of the memory-graph project, and a fast static build — no framework bloat.',
-      progress_pct: 30, streak_days: 3,
       created_at: now - 18*GOALS_DAY, target_date: now - 2*GOALS_DAY, // overdue on purpose
+      objectives: [
+        obj('Draft case study: memory-graph project', true),
+        obj('Draft case study: task runner', false),
+        obj('Draft case study: preview pipeline', false),
+        obj('Rebuild site without a framework', true),
+        obj('Deploy to production domain', false),
+      ],
     },
     {
       id: 'g3', title: 'Read 12 books this year', category: 'Learning', difficulty: 'easy', status: 'active',
       description: 'One book a month, mix of fiction and non-fiction. Currently on book 10.',
-      progress_pct: 83, streak_days: 0,
       created_at: now - 210*GOALS_DAY, target_date: now + 55*GOALS_DAY,
+      objectives: [
+        obj('Finish books 1 through 6', true),
+        obj('Finish books 7 through 10', true),
+        obj('Finish books 11 and 12', false),
+      ],
     },
     {
-      id: 'g4', title: 'Learn conversational Spanish', category: 'Learning', difficulty: 'epic', status: 'active',
-      description: 'Daily app lessons plus one live conversation exchange per week. Long-horizon goal, slow and steady.',
-      progress_pct: 12, streak_days: 5,
-      created_at: now - 9*GOALS_DAY, target_date: now + 300*GOALS_DAY,
-    },
-    {
-      id: 'g5', title: 'Meditate daily for a month', category: 'Health', difficulty: 'easy', status: 'completed',
+      id: 'g4', title: 'Meditate daily for a month', category: 'Health', difficulty: 'easy', status: 'completed',
       description: 'Ten minutes every morning before checking the phone. Finished the full 30 days.',
-      progress_pct: 100, streak_days: 30,
       created_at: now - 70*GOALS_DAY, target_date: now - 40*GOALS_DAY, completed_at: now - 39*GOALS_DAY,
+      objectives: [
+        obj('Establish a morning routine', true),
+        obj('Complete week 1', true),
+        obj('Complete weeks 2-3', true),
+        obj('Complete week 4', true),
+      ],
     },
     {
-      id: 'g6', title: 'Launch side-business MVP', category: 'Career', difficulty: 'hard', status: 'completed',
-      description: 'Landing page, waitlist, and first five paying customers. Shipped and validated.',
-      progress_pct: 100, streak_days: 0,
-      created_at: now - 160*GOALS_DAY, target_date: now - 90*GOALS_DAY, completed_at: now - 88*GOALS_DAY,
-    },
-    {
-      id: 'g7', title: 'Train for a marathon', category: 'Health', difficulty: 'epic', status: 'paused',
+      id: 'g5', title: 'Train for a marathon', category: 'Health', difficulty: 'epic', status: 'paused',
       description: 'Paused after a minor knee strain — resuming once cleared by physio. Base mileage was going well before the break.',
-      progress_pct: 45, streak_days: 0,
       created_at: now - 65*GOALS_DAY, target_date: now + 80*GOALS_DAY,
-    },
-    {
-      id: 'g8', title: 'Write a novel draft', category: 'Creative', difficulty: 'hard', status: 'abandoned',
-      description: 'Got to 20k words then priorities shifted. Keeping the notes in case this comes back around.',
-      progress_pct: 20, streak_days: 0,
-      created_at: now - 300*GOALS_DAY, target_date: now - 120*GOALS_DAY,
+      objectives: [
+        obj('Base mileage to 20mi/week', true),
+        obj('Build to 30mi/week', false),
+        obj('Get physio clearance', false),
+        obj('Register for race', false),
+      ],
     },
   ];
 }
@@ -424,19 +445,22 @@ function fmtAgeShort(ms) {
   return Math.round(days/365) + 'y ago';
 }
 
-function GoalCard(props) {
+function GoalBox(props) {
   const g = props.g;
   const [open, setOpen] = React.useState(false);
   const diff = DIFFICULTY[g.difficulty];
   const color = GOAL_STATUS_COLOR[g.status];
   const overdue = g.status === 'active' && g.target_date < Date.now();
+  const total = g.objectives.length;
+  const done = g.objectives.filter(o => o.done).length;
+  const ratio = total ? done / total : 0;
   const meterColor = overdue ? '#ff7b72' : color;
   let dateLine;
   if (g.status === 'completed') dateLine = 'completed ' + fmtAgeShort(g.completed_at);
   else if (g.status === 'active') dateLine = (overdue ? 'was due ' : 'due ') + fmtRelDay(g.target_date);
   else dateLine = 'target ' + fmtRelDay(g.target_date);
-  return h('div', {className:'card', style:{cursor:'pointer'}, onClick:()=>setOpen(!open)},
-    h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px'}},
+  return h('div', {className:'goal-box', onClick:()=>setOpen(!open)},
+    h('div', {className:'goal-box-head'},
       h('p', {style:{fontSize:'15px',fontWeight:700,margin:'0 0 2px'}}, g.title),
       h('span', {className:'pill', style:{background:diff.color+'22', color:diff.color, border:'1px solid '+diff.color+'55'}}, diff.label)),
     h('div', {style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},
@@ -446,59 +470,39 @@ function GoalCard(props) {
       h('span', {className:'small'}, g.category),
       h('span', {className:'small'}, '·'),
       h('span', {className:'small', style:{color: overdue ? '#ff7b72' : '#9aa3ad'}}, dateLine)),
-    h('div', {className:'meter'}, h('div', {style:{width:g.progress_pct+'%', background:meterColor}})),
-    h('div', {className:'small'}, g.progress_pct + '% complete' + (g.streak_days ? '  ·  🔥 ' + g.streak_days + ' day streak' : '')),
-    open ? h('div', {className:'goal-desc'}, g.description) : null);
+    h('div', {className:'meter'}, h('div', {style:{width:(ratio*100)+'%', background:meterColor}})),
+    h('div', {className:'goal-obj-count'}, done + ' / ' + total + ' mini-objectives'),
+    open ? h('div', null,
+      h('div', {className:'goal-desc'}, g.description),
+      h('div', {className:'goal-checklist'},
+        g.objectives.map(o => h('label', {
+            key:o.id, className:'goal-obj' + (o.done ? ' done' : ''),
+            onClick:(e)=>e.stopPropagation(),
+          },
+          h('input', {type:'checkbox', checked:o.done, onChange:()=>props.onToggle(g.id, o.id)}),
+          h('span', null, o.text)))) : null));
 }
 
 function Goals(props) {
   const [goals, setGoals] = React.useState(makeGoalFixtures);
-  const [filter, setFilter] = React.useState('all');
-  const [showAdd, setShowAdd] = React.useState(false);
-  const [form, setForm] = React.useState({title:'', category:'Health', difficulty:'medium', target:''});
 
-  const counts = {active:0, completed:0, paused:0, abandoned:0};
-  goals.forEach(g => { counts[g.status] = (counts[g.status]||0) + 1; });
-  const list = goals.filter(g => filter === 'all' || g.status === filter);
-
-  function addGoal() {
-    const title = form.title.trim();
-    if (!title) { alert('Give the goal a title.'); return; }
-    const target_date = form.target ? new Date(form.target).getTime() : Date.now() + 30*GOALS_DAY;
-    // In-memory only: no supabase.insert() here by design (see NOTE above).
-    setGoals(gs => [{
-      id: 'g' + (Date.now()), title, category: form.category, difficulty: form.difficulty,
-      status: 'active', description: '(no description yet)', progress_pct: 0, streak_days: 0,
-      created_at: Date.now(), target_date,
-    }, ...gs]);
-    setShowAdd(false);
-    setForm({title:'', category:'Health', difficulty:'medium', target:''});
+  function toggleObjective(goalId, objId) {
+    // In-memory only: no supabase.update() here by design (see NOTE above).
+    setGoals(gs => gs.map(g => g.id !== goalId ? g : {
+      ...g, objectives: g.objectives.map(o => o.id !== objId ? o : {...o, done: !o.done}),
+    }));
   }
 
   return h('div', {id:'goals'},
     h('div', {className:'summary'},
-      h('span', null, h('b', null, counts.active||0), ' active'),
-      h('span', null, h('b', null, counts.completed||0), ' completed'),
-      h('span', null, h('b', null, counts.paused||0), ' paused'),
-      h('span', null, h('b', null, counts.abandoned||0), ' abandoned')),
-    h('div', {className:'filterbar'},
-      [['all','All'],['active','Active'],['completed','Completed'],['paused','Paused'],['abandoned','Abandoned']].map(([k,label]) =>
-        h('button', {key:k, className:'filterbtn' + (filter===k?' active':''), onClick:()=>setFilter(k)}, label))),
-    showAdd ? h('div', {className:'card'},
-      h('p', {style:{fontSize:'15px',fontWeight:700,margin:'0 0 8px'}}, 'New goal'),
-      h('div', {className:'addform'},
-        h('input', {placeholder:'Goal title', value:form.title, onChange:e=>setForm({...form, title:e.target.value})}),
-        h('div', {className:'row2'},
-          h('select', {value:form.category, onChange:e=>setForm({...form, category:e.target.value})},
-            ['Health','Career','Learning','Creative','Finance'].map(c => h('option', {key:c}, c))),
-          h('select', {value:form.difficulty, onChange:e=>setForm({...form, difficulty:e.target.value})},
-            Object.keys(DIFFICULTY).map(k => h('option', {key:k, value:k}, DIFFICULTY[k].label)))),
-        h('input', {type:'date', value:form.target, onChange:e=>setForm({...form, target:e.target.value})}),
-        h('div', {className:'row2'},
-          h('button', {className:'secondary', onClick:()=>setShowAdd(false)}, 'Cancel'),
-          h('button', {onClick:addGoal}, 'Add goal'))))
-    : h('button', {className:'secondary newgoalbtn', onClick:()=>setShowAdd(true)}, '+ New goal'),
-    list.length ? list.map(g => h(GoalCard, {key:g.id, g})) : h('p', {className:'muted'}, 'No goals in this filter yet.'));
+      h('span', null, h('b', null, goals.length), ' goals'),
+      h('span', null, h('b', null, goals.reduce((n,g)=>n+g.objectives.filter(o=>o.done).length,0)), ' objectives done')),
+    h('div', {className:'goal-path'},
+      goals.map((g, i) => h('div', {className:'goal-row', key:g.id},
+        h('div', {className:'goal-connector'},
+          h('span', {className:'goal-node-dot', style:{color: GOAL_STATUS_COLOR[g.status]}}),
+          i < goals.length - 1 ? h('span', {className:'goal-node-line'}) : null),
+        h(GoalBox, {g, onToggle: toggleObjective})))));
 }
 
 function App() {

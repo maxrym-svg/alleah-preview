@@ -25,7 +25,7 @@ button:disabled{opacity:.5}
 .muted{color:#9aa3ad;font-size:14px}
 .err{color:#ff7b72;font-size:14px;padding:0 14px}
 .typing{align-self:flex-start;color:#9aa3ad;font-size:14px;padding:0 6px}
-#tasks{flex:1;overflow-y:auto;padding:8px 14px}
+#tasks,#goals{flex:1;overflow-y:auto;padding:8px 14px}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
 .dot{width:8px;height:8px;border-radius:50%}
 .pulse{animation:pulse 1.5s infinite}
@@ -40,6 +40,23 @@ button:disabled{opacity:.5}
 .task-full{white-space:pre-wrap;background:#12151a;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;max-height:320px;overflow-y:auto;font-size:14px}
 .auth{padding:16px 14px}
 .auth button{padding:12px 18px;margin-top:10px}
+.pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.summary{display:flex;gap:14px;flex-wrap:wrap;padding:2px 2px 10px;color:#9aa3ad;font-size:12px}
+.summary b{color:#e6e6e6}
+.goal-desc{white-space:pre-wrap;background:#0f1115;border:1px solid #2c313a;border-radius:8px;padding:10px;margin-top:8px;font-size:13.5px;color:#c7ccd3}
+.goal-path{display:flex;flex-direction:column}
+.goal-row{display:flex;gap:10px}
+.goal-connector{display:flex;flex-direction:column;align-items:center;width:18px;flex:none}
+.goal-node-dot{width:14px;height:14px;border-radius:50%;flex:none;margin-top:14px;box-shadow:0 0 0 3px #0f1115,0 0 0 4.5px currentColor}
+.goal-node-line{width:2px;flex:1;min-height:22px;background:#2c313a;margin:4px 0}
+.goal-box{flex:1;min-width:0;background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer}
+.goal-box-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.goal-obj-count{font-size:12px;color:#9aa3ad}
+.goal-checklist{margin-top:10px;padding-top:10px;border-top:1px solid #2c313a;display:flex;flex-direction:column;gap:2px}
+.goal-obj{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.goal-obj input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:#3ecf8e;cursor:pointer}
+.goal-obj span{font-size:14px}
+.goal-obj.done span{text-decoration:line-through;color:#9aa3ad}
 
 /* ---- header menu ---- */
 .menu-wrap{position:relative}
@@ -137,6 +154,92 @@ function fmtAge(ms) {
   return Math.floor(m/1440) + 'd ago';
 }
 
+// ===== Goals fixtures =====
+// Restored rev-0 presentation (recovered from the original 2a9e67c9 build): goals
+// render as boxes connected by a dot-and-line path, each expandable into a checklist
+// of mini-objectives. Fixture-backed only - no network, no persistence beyond memory.
+const DIFFICULTY = {
+  easy:   {label:'Easy',   color:'#3ecf8e'},
+  medium: {label:'Medium', color:'#58a6ff'},
+  hard:   {label:'Hard',   color:'#e0a458'},
+  epic:   {label:'Epic',   color:'#d68fff'},
+};
+const GOAL_STATUS_COLOR = {active:'#3ecf8e', completed:'#3ecf8e', paused:'#e0a458', abandoned:'#5c636e'};
+let objSeq = 0;
+function mkObj(text, done) { objSeq += 1; return {id:'o' + objSeq, text, done: !!done}; }
+
+const GOALS = [
+  {
+    id:'g1', title:'Run a 10K', category:'Health', difficulty:'medium', status:'active',
+    description:'Build up long-run mileage on the weekends and keep two easy runs during the week until race pace feels comfortable for the full distance.',
+    created_at: NOW - 40*DAY, target_date: NOW + 21*DAY,
+    objectives:[
+      mkObj('Build base mileage to 15mi/week', true),
+      mkObj('Add one tempo run per week', true),
+      mkObj('Complete an 8-mile long run', true),
+      mkObj('Taper and lock in race-week plan', false),
+    ],
+  },
+  {
+    id:'g2', title:'Ship personal portfolio site', category:'Career', difficulty:'hard', status:'active',
+    description:'Rebuild the portfolio with three case studies, a proper writeup of the memory-graph project, and a fast static build — no framework bloat.',
+    created_at: NOW - 18*DAY, target_date: NOW - 2*DAY,
+    objectives:[
+      mkObj('Draft case study: memory-graph project', true),
+      mkObj('Draft case study: task runner', false),
+      mkObj('Draft case study: preview pipeline', false),
+      mkObj('Rebuild site without a framework', true),
+      mkObj('Deploy to production domain', false),
+    ],
+  },
+  {
+    id:'g3', title:'Read 12 books this year', category:'Learning', difficulty:'easy', status:'active',
+    description:'One book a month, mix of fiction and non-fiction. Currently on book 10.',
+    created_at: NOW - 210*DAY, target_date: NOW + 55*DAY,
+    objectives:[
+      mkObj('Finish books 1 through 6', true),
+      mkObj('Finish books 7 through 10', true),
+      mkObj('Finish books 11 and 12', false),
+    ],
+  },
+  {
+    id:'g4', title:'Meditate daily for a month', category:'Health', difficulty:'easy', status:'completed',
+    description:'Ten minutes every morning before checking the phone. Finished the full 30 days.',
+    created_at: NOW - 70*DAY, target_date: NOW - 40*DAY, completed_at: NOW - 39*DAY,
+    objectives:[
+      mkObj('Establish a morning routine', true),
+      mkObj('Complete week 1', true),
+      mkObj('Complete weeks 2-3', true),
+      mkObj('Complete week 4', true),
+    ],
+  },
+  {
+    id:'g5', title:'Train for a marathon', category:'Health', difficulty:'epic', status:'paused',
+    description:'Paused after a minor knee strain — resuming once cleared by physio. Base mileage was going well before the break.',
+    created_at: NOW - 65*DAY, target_date: NOW + 80*DAY,
+    objectives:[
+      mkObj('Base mileage to 20mi/week', true),
+      mkObj('Build to 30mi/week', false),
+      mkObj('Get physio clearance', false),
+      mkObj('Register for race', false),
+    ],
+  },
+];
+
+function fmtRelDay(ms) {
+  const days = Math.round((ms - NOW) / DAY);
+  if (days === 0) return 'today';
+  if (days > 0) return 'in ' + days + 'd';
+  return Math.abs(days) + 'd ago';
+}
+function fmtAgeShort(ms) {
+  const days = Math.round((NOW - ms) / DAY);
+  if (days < 1) return 'today';
+  if (days < 30) return days + 'd ago';
+  if (days < 365) return Math.round(days/30) + 'mo ago';
+  return Math.round(days/365) + 'y ago';
+}
+
 // ===== app state =====
 const state = {
   signedIn: true,
@@ -146,6 +249,8 @@ const state = {
   text: '',
   busy: false,
   openTasks: {},
+  goals: GOALS.map(g => ({...g, objectives: g.objectives.map(o => ({...o}))})),
+  openGoals: {},
 };
 
 const root = document.getElementById('root');
@@ -159,6 +264,7 @@ function setState(patch) { Object.assign(state, patch); render(); }
 const VIEWS = [
   {key:'chat', label:'Chat'},
   {key:'tasks', label:'Tasks'},
+  {key:'goals', label:'Goals'},
 ];
 
 function renderHeaderMenu() {
@@ -341,6 +447,76 @@ function renderTasks() {
   return wrap;
 }
 
+function toggleObjective(goalId, objId) {
+  const g = state.goals.find(x => x.id === goalId);
+  if (!g) return;
+  const o = g.objectives.find(x => x.id === objId);
+  if (!o) return;
+  o.done = !o.done;
+  render();
+}
+
+function renderGoalBox(g) {
+  const diff = DIFFICULTY[g.difficulty];
+  const color = GOAL_STATUS_COLOR[g.status];
+  const overdue = g.status === 'active' && g.target_date < NOW;
+  const total = g.objectives.length;
+  const done = g.objectives.filter(o => o.done).length;
+  const ratio = total ? done / total : 0;
+  const meterColor = overdue ? '#ff7b72' : color;
+  let dateLine;
+  if (g.status === 'completed') dateLine = 'completed ' + fmtAgeShort(g.completed_at);
+  else if (g.status === 'active') dateLine = (overdue ? 'was due ' : 'due ') + fmtRelDay(g.target_date);
+  else dateLine = 'target ' + fmtRelDay(g.target_date);
+  const open = !!state.openGoals[g.id];
+
+  const box = h('div', {class:'goal-box', onclick: () => { state.openGoals[g.id] = !open; render(); }});
+  box.appendChild(h('div', {class:'goal-box-head'},
+    h('p', {style:{fontSize:'15px', fontWeight:'700', margin:'0 0 2px'}}, g.title),
+    h('span', {class:'pill', style:{background:diff.color+'22', color:diff.color, border:'1px solid '+diff.color+'55'}}, diff.label)));
+  box.appendChild(h('div', {style:{display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}},
+    h('span', {class:'badge'},
+      h('span', {class:'dot' + (g.status==='active' ? ' pulse' : ''), style:{background:color}}),
+      h('span', {style:{color:color}}, g.status)),
+    h('span', {class:'small'}, g.category),
+    h('span', {class:'small'}, '·'),
+    h('span', {class:'small', style:{color: overdue ? '#ff7b72' : '#9aa3ad'}}, dateLine)));
+  box.appendChild(h('div', {class:'meter'}, h('div', {style:{width:(ratio*100)+'%', background:meterColor}})));
+  box.appendChild(h('div', {class:'goal-obj-count'}, done + ' / ' + total + ' mini-objectives'));
+  if (open) {
+    box.appendChild(h('div', {class:'goal-desc'}, g.description));
+    const list = h('div', {class:'goal-checklist'});
+    g.objectives.forEach(o => {
+      const row = h('label', {class:'goal-obj' + (o.done ? ' done' : ''), onclick: (e) => e.stopPropagation()},
+        h('input', {type:'checkbox', checked: o.done, onchange: () => toggleObjective(g.id, o.id)}),
+        h('span', null, o.text));
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+  }
+  return box;
+}
+
+function renderGoals() {
+  const wrap = h('div', {id:'goals'});
+  const doneCount = state.goals.reduce((n,g) => n + g.objectives.filter(o=>o.done).length, 0);
+  wrap.appendChild(h('div', {class:'summary'},
+    h('span', null, h('b', null, String(state.goals.length)), ' goals'),
+    h('span', null, h('b', null, String(doneCount)), ' objectives done')));
+  const path = h('div', {class:'goal-path'});
+  state.goals.forEach((g, i) => {
+    const row = h('div', {class:'goal-row'});
+    const connector = h('div', {class:'goal-connector'},
+      h('span', {class:'goal-node-dot', style:{color: GOAL_STATUS_COLOR[g.status]}}));
+    if (i < state.goals.length - 1) connector.appendChild(h('span', {class:'goal-node-line'}));
+    row.appendChild(connector);
+    row.appendChild(renderGoalBox(g));
+    path.appendChild(row);
+  });
+  wrap.appendChild(path);
+  return wrap;
+}
+
 // ===== root render =====
 function render() {
   root.innerHTML = '';
@@ -352,6 +528,7 @@ function render() {
   root.appendChild(header);
 
   if (state.view === 'tasks') root.appendChild(renderTasks());
+  else if (state.view === 'goals') root.appendChild(renderGoals());
   else root.appendChild(renderChat());
 }
 
@@ -360,7 +537,7 @@ render();
 </script>
 
 <!-- alleah-overlay-start -->
-<meta name="preview-rev" content="17a0a322-r2-1785437090">
+<meta name="preview-rev" content="17a0a322-r3-1785440776">
 <style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
    All classes prefixed apo- to avoid colliding with app styles. */
 
@@ -497,7 +674,7 @@ render();
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "17a0a322-a845-4ac2-9ac7-cf96c7b0731f", "revision": 2, "deploy_marker": "17a0a322-r2-1785437090", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 1, "note": "Add the goals view to the menu so it ships together with the drop down menu the staged copy already contains the goals code unlinked- add[key:\u2019goals\u2019,label:goals\u2019] to VEIWS - and update this demo so goals show in the menu too", "resolution": "resolved"}, {"revision": 1, "note": "Add the Goals view to the menu ({key:'goals', label:'Goals'} in VIEWS) so it ships with the dropdown - and replace the current card-list Goals implementation in this task's staged and demo files with the ORIGINAL Goals build (rev 0): recover it from this repo's git history at commit 196721eefd, path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html - the version with goal boxes connected by dots/lines and expandable mini-objective checklists, before the map restyle. Adapt it faithfully into each f", "resolution": "resolved"}]}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "17a0a322-a845-4ac2-9ac7-cf96c7b0731f", "revision": 3, "deploy_marker": "17a0a322-r3-1785440776", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "changelog": [{"revision": 1, "note": "Add the goals view to the menu so it ships together with the drop down menu the staged copy already contains the goals code unlinked- add[key:\u2019goals\u2019,label:goals\u2019] to VEIWS - and update this demo so goals show in the menu too", "resolution": "resolved"}, {"revision": 2, "note": "Add the Goals view to the menu ({key:'goals', label:'Goals'} in VIEWS) so it ships with the dropdown - and replace the current card-list Goals implementation in this task's staged and demo files with the ORIGINAL Goals build (rev 0): recover it from this repo's git history at commit 196721eefd, path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html - the version with goal boxes connected by dots/lines and expandable mini-objective checklists, before the map restyle. Adapt it faithfully into each f", "resolution": "resolved"}, {"revision": 2, "note": "Trigger for the two reopened Goals pins: add {key:'goals', label:'Goals'} to VIEWS in the staged file, and add the Goals view to BOTH demo and staged - using the ORIGINAL rev-0 Goals implementation recovered from git commit 196721eefd path 2a9e67c9-8dfc-4420-b45f-f8c8bf20d7e6/index.html (goal boxes connected by dots/lines, expandable mini-objective checklists). Fixture-backed, no DB calls, no migrations.", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type
