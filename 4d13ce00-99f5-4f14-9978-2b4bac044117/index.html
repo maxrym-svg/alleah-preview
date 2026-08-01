@@ -282,7 +282,7 @@ renderView();
 </script>
 
 <!-- alleah-overlay-start -->
-<meta name="preview-rev" content="4d13ce00-r0-1785621633">
+<meta name="preview-rev" content="4d13ce00-r1-1785622087">
 <style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
    All classes prefixed apo- to avoid colliding with app styles. */
 
@@ -442,7 +442,7 @@ renderView();
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "4d13ce00-99f5-4f14-9978-2b4bac044117", "revision": 0, "deploy_marker": "4d13ce00-r0-1785621633", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "4d13ce00-99f5-4f14-9978-2b4bac044117", "revision": 1, "deploy_marker": "4d13ce00-r1-1785622087", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": [{"revision": 0, "note": "Remove staged/006_upgrades.sql entirely - the tables it creates (optimization_proposals, research_directives) already exist in production with the correct RLS policies from an earlier applied migration; this feature requires zero schema changes. Delete that one staged file and change nothing else.", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type
