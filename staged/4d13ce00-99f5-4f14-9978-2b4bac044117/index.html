@@ -599,9 +599,12 @@ function Goals(props) {
 }
 
 // ===== Upgrades tab =====
-// Reads/writes exactly two tables: optimization_proposals (select all own rows,
-// ordered by priority desc; update status on approve/reject) and research_directives
-// (insert only, from the queue-a-question form below the list). See migration 006.
+// Reads/writes three tables: optimization_proposals (select all own rows, ordered by
+// priority desc; update status on approve/reject), research_directives (insert only,
+// from the queue-a-question form below the list), and worker_tasks (insert only - a
+// single 'build' task queued when a proposal is Approved & Built, see below). See
+// migration 006 for optimization_proposals/research_directives; worker_tasks already
+// exists (used by the Tasks tab).
 const BENEFIT_TYPES = {
   ui_improvement:    {label: 'UI improvement',    color: '#58a6ff'},
   efficiency_upgrade:{label: 'Efficiency upgrade',color: '#3ecf8e'},
@@ -617,6 +620,9 @@ const PROPOSAL_STATUS = {
   rejected: {label: 'Rejected', color: '#ff7b72'},
 };
 const STATUS_FILTERS = ['all', 'proposed', 'approved', 'building', 'done', 'rejected'];
+// Exact guardrail sentence appended to every "Approve & Build" worker_tasks.instruction,
+// per Max's pin. Composed as: title, then summary, then implementation_plan, then this.
+const BUILD_GUARDRAIL_SENTENCE = 'Build this as an app-surface preview only: ';
 
 function UpgradeCard(props) {
   const p = props.p;
@@ -639,7 +645,7 @@ function UpgradeCard(props) {
         h('div', {className:'meter'}, h('div', {style:{width:(p.cost_score*10)+'%', background:'#e0a458'}})))),
     h('div', {className:'priority-num'}, 'Priority score: ', h('b', null, (p.functionality_score - p.cost_score))),
     p.status === 'proposed' ? h('div', {className:'upgrade-actions'},
-      h('button', {type:'button', onClick:()=>props.onDecide(p.id, 'approved')}, 'Approve'),
+      h('button', {type:'button', onClick:()=>props.onApprove(p)}, 'Approve & Build'),
       h('button', {type:'button', className:'reject-btn', onClick:()=>props.onDecide(p.id, 'rejected')}, 'Reject')) : null);
 }
 
@@ -691,6 +697,20 @@ function Upgrades(props) {
     if (r.error) { setProposals(prev); setMsg('Error: ' + r.error.message); }
   }
 
+  // Approve & Build: confirm, flip the proposal to 'approved', then queue a capped
+  // build worker_task whose instruction chains title -> summary -> implementation_plan
+  // -> the exact guardrail sentence (see BUILD_GUARDRAIL_SENTENCE above).
+  async function approveAndBuild(p) {
+    if (!confirm('Approve and queue a build task (~$2 cap)?')) return;
+    const prev = proposals;
+    setProposals(ps => ps.map(x => x.id === p.id ? {...x, status:'approved'} : x)); // optimistic
+    const r = await supabase.from('optimization_proposals').update({status:'approved'}).eq('id', p.id);
+    if (r.error) { setProposals(prev); setMsg('Error: ' + r.error.message); return; }
+    const instruction = [p.title, p.summary, p.implementation_plan || '', BUILD_GUARDRAIL_SENTENCE].join('\n\n');
+    const r2 = await supabase.from('worker_tasks').insert({kind:'build', status:'queued', instruction});
+    if (r2.error) setMsg('Approved, but failed to queue build: ' + r2.error.message);
+  }
+
   async function queueDirective(directive_text, priority) {
     const r = await supabase.from('research_directives').insert({directive_text, priority});
     setDirectiveMsg(r.error ? 'Error: ' + r.error.message : 'Question queued.');
@@ -714,7 +734,7 @@ function Upgrades(props) {
       STATUS_FILTERS.filter(f => f !== 'all').map(f => h('span', {key:f},
         h('b', null, counts[f]), ' ' + PROPOSAL_STATUS[f].label.toLowerCase()))) : null,
     msg ? h('p', {className:'muted'}, msg) : null,
-    visible.map(p => h(UpgradeCard, {key:p.id, p, onDecide:decide})),
+    visible.map(p => h(UpgradeCard, {key:p.id, p, onDecide:decide, onApprove:approveAndBuild})),
     visible.length === 0 && proposals.length > 0 ? h('p', {className:'muted', style:{padding:'8px 2px'}}, 'No proposals match this filter.') : null,
     h(ResearchDirectiveForm, {onSubmit:queueDirective}),
     directiveMsg ? h('p', {className:'small', style:{color:'#3ecf8e'}}, directiveMsg) : null);
