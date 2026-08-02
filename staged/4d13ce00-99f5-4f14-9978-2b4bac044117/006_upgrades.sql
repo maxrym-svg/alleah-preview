@@ -1,4 +1,0 @@
--- Migration 006 removed: optimization_proposals and research_directives already exist in
--- production (created by an earlier applied migration) with the correct RLS policies in place.
--- The Upgrades tab feature requires zero schema changes, so this migration is intentionally
--- a no-op and left empty.
