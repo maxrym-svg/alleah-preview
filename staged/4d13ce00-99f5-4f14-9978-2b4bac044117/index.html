@@ -599,8 +599,9 @@ function Goals(props) {
 }
 
 // ===== Upgrades tab =====
-// Reads/writes three tables: optimization_proposals (select all own rows, ordered by
-// priority desc; update status on approve/reject), research_directives (insert only,
+// Reads/writes three tables: optimization_proposals (select own rows, limited to the
+// columns this view renders, ordered by priority desc with nulls last, capped to 100;
+// update status on approve/reject), research_directives (insert only,
 // from the queue-a-question form below the list), and worker_tasks (insert only - a
 // single 'build' task queued when a proposal is Approved & Built, see below). See
 // migration 006 for optimization_proposals/research_directives; worker_tasks already
@@ -619,15 +620,24 @@ const PROPOSAL_STATUS = {
   done:     {label: 'Done',     color: '#3ecf8e'},
   rejected: {label: 'Rejected', color: '#ff7b72'},
 };
-const STATUS_FILTERS = ['all', 'proposed', 'approved', 'building', 'done', 'rejected'];
+const KNOWN_STATUSES = ['proposed', 'approved', 'building', 'done', 'rejected'];
+// Statuses outside KNOWN_STATUSES are bucketed under 'other' so per-status counts
+// always sum to the proposal total, regardless of what values land in the column.
+const STATUS_FILTERS = ['all', 'proposed', 'approved', 'building', 'done', 'rejected', 'other'];
 // Exact guardrail sentence appended to every "Approve & Build" worker_tasks.instruction,
 // per Max's pin. Composed as: title, then summary, then implementation_plan, then this.
 const BUILD_GUARDRAIL_SENTENCE = 'Build this as an app-surface preview only: ';
 
 function UpgradeCard(props) {
   const p = props.p;
-  const benefit = BENEFIT_TYPES[p.benefit_type] || {label: p.benefit_type, color: '#9aa3ad'};
+  // Benefit chip fallback: raw benefit_type string, or 'unknown' if the field
+  // itself is missing - the chip must never render blank.
+  const benefit = BENEFIT_TYPES[p.benefit_type] || {label: (p.benefit_type || 'unknown'), color: '#9aa3ad'};
   const status = PROPOSAL_STATUS[p.status] || {label: p.status, color: '#9aa3ad'};
+  // Scores render as (value ?? '-')/10; meters and the priority line are hidden
+  // whenever either score is null. Priority always comes from the DB `priority`
+  // column - it is never recomputed client-side.
+  const hasScores = p.functionality_score != null && p.cost_score != null;
   return h('div', {className:'card'},
     h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px'}},
       h('span', {className:'chip', style:{background:benefit.color+'22', color:benefit.color, borderColor:benefit.color+'55'}}, benefit.label),
@@ -638,12 +648,12 @@ function UpgradeCard(props) {
     h('p', {className:'small', style:{fontSize:'13.5px',color:'#c7ccd3',margin:'2px 0 0'}}, p.summary),
     h('div', {className:'score-row'},
       h('div', {className:'score-col'},
-        h('div', {className:'score-label'}, h('span', null, 'Functionality'), h('span', null, p.functionality_score + '/10')),
-        h('div', {className:'meter'}, h('div', {style:{width:(p.functionality_score*10)+'%', background:'#3ecf8e'}}))),
+        h('div', {className:'score-label'}, h('span', null, 'Functionality'), h('span', null, (p.functionality_score ?? '-') + '/10')),
+        hasScores ? h('div', {className:'meter'}, h('div', {style:{width:(p.functionality_score*10)+'%', background:'#3ecf8e'}})) : null),
       h('div', {className:'score-col'},
-        h('div', {className:'score-label'}, h('span', null, 'Cost'), h('span', null, p.cost_score + '/10')),
-        h('div', {className:'meter'}, h('div', {style:{width:(p.cost_score*10)+'%', background:'#e0a458'}})))),
-    h('div', {className:'priority-num'}, 'Priority score: ', h('b', null, (p.functionality_score - p.cost_score))),
+        h('div', {className:'score-label'}, h('span', null, 'Cost'), h('span', null, (p.cost_score ?? '-') + '/10')),
+        hasScores ? h('div', {className:'meter'}, h('div', {style:{width:(p.cost_score*10)+'%', background:'#e0a458'}})) : null)),
+    hasScores ? h('div', {className:'priority-num'}, 'Priority score: ', h('b', null, (p.priority ?? '-'))) : null,
     p.status === 'proposed' ? h('div', {className:'upgrade-actions'},
       h('button', {type:'button', onClick:()=>props.onApprove(p)}, 'Approve & Build'),
       h('button', {type:'button', className:'reject-btn', onClick:()=>props.onDecide(p.id, 'rejected')}, 'Reject')) : null);
@@ -659,9 +669,11 @@ function ResearchDirectiveForm(props) {
     const t = text.trim();
     if (!t || busy) return;
     setBusy(true);
-    await props.onSubmit(t, Number(priority));
+    // Only clear the fields on a confirmed successful insert - on failure the
+    // user's text (and chosen priority) stay put so nothing typed is lost.
+    const ok = await props.onSubmit(t, Number(priority));
     setBusy(false);
-    setText(''); setPriority('3');
+    if (ok) { setText(''); setPriority('3'); }
   }
 
   return h('form', {className:'card addform', onSubmit:submit},
@@ -681,31 +693,72 @@ function Upgrades(props) {
   const [filter, setFilter] = React.useState('all');
   const [msg, setMsg] = React.useState('loading...');
   const [directiveMsg, setDirectiveMsg] = React.useState('');
+  const [directiveErr, setDirectiveErr] = React.useState(false);
+  // Ref-held timer for the directive status message: always cleared before a new
+  // one is scheduled (new submission) and on unmount, so a stale message from a
+  // previous request can never be cleared out from under a newer one.
+  const directiveTimerRef = React.useRef(null);
+  React.useEffect(() => {
+    return () => { if (directiveTimerRef.current) clearTimeout(directiveTimerRef.current); };
+  }, []);
+  function scheduleDirectiveMsgClear() {
+    if (directiveTimerRef.current) clearTimeout(directiveTimerRef.current);
+    directiveTimerRef.current = setTimeout(() => {
+      setDirectiveMsg('');
+      directiveTimerRef.current = null;
+    }, 3000);
+  }
 
+  // Select only the columns the view renders, ordered by priority descending with
+  // nulls sorted last, capped to the most recent/highest-priority 100 rows.
   async function load() {
-    const r = await supabase.from('optimization_proposals').select('*').order('priority', {ascending:false});
+    const r = await supabase.from('optimization_proposals')
+      .select('id,benefit_type,title,summary,implementation_plan,functionality_score,cost_score,priority,status')
+      .order('priority', {ascending:false, nullsFirst:false})
+      .limit(100);
     if (r.error) { setMsg('Error: ' + r.error.message); return; }
     setProposals(r.data);
     setMsg(r.data.length ? '' : 'No proposals yet. Alleah will file these as she finds them.');
   }
   React.useEffect(() => { load(); }, []);
 
+  // Every status update chains .select() and guards with .eq('status','proposed')
+  // so a stale card can never overwrite a row the pipeline already moved on. Zero
+  // rows returned (no error, but nothing matched) is treated as a failure too, and
+  // only the single affected row is rolled back - never a whole-array snapshot.
   async function decide(id, status) {
-    const prev = proposals;
+    const prevRow = proposals.find(p => p.id === id);
+    const prevStatus = prevRow ? prevRow.status : undefined;
     setProposals(ps => ps.map(p => p.id === id ? {...p, status} : p)); // optimistic
-    const r = await supabase.from('optimization_proposals').update({status}).eq('id', id);
-    if (r.error) { setProposals(prev); setMsg('Error: ' + r.error.message); }
+    const r = await supabase.from('optimization_proposals')
+      .update({status})
+      .eq('id', id)
+      .eq('status', 'proposed')
+      .select();
+    if (r.error || !r.data || r.data.length === 0) {
+      setProposals(ps => ps.map(p => p.id === id ? {...p, status: prevStatus ?? p.status} : p));
+      setMsg('Error: ' + (r.error ? r.error.message : 'that proposal was already updated elsewhere.'));
+    }
   }
 
-  // Approve & Build: confirm, flip the proposal to 'approved', then queue a capped
-  // build worker_task whose instruction chains title -> summary -> implementation_plan
-  // -> the exact guardrail sentence (see BUILD_GUARDRAIL_SENTENCE above).
+  // Approve & Build: confirm, flip the proposal to 'approved' (guarded the same way
+  // as decide() above), then queue a capped build worker_task whose instruction
+  // chains title -> summary -> implementation_plan -> the exact guardrail sentence
+  // (see BUILD_GUARDRAIL_SENTENCE above).
   async function approveAndBuild(p) {
     if (!confirm('Approve and queue a build task (~$2 cap)?')) return;
-    const prev = proposals;
+    const prevStatus = p.status;
     setProposals(ps => ps.map(x => x.id === p.id ? {...x, status:'approved'} : x)); // optimistic
-    const r = await supabase.from('optimization_proposals').update({status:'approved'}).eq('id', p.id);
-    if (r.error) { setProposals(prev); setMsg('Error: ' + r.error.message); return; }
+    const r = await supabase.from('optimization_proposals')
+      .update({status:'approved'})
+      .eq('id', p.id)
+      .eq('status', 'proposed')
+      .select();
+    if (r.error || !r.data || r.data.length === 0) {
+      setProposals(ps => ps.map(x => x.id === p.id ? {...x, status: prevStatus} : x));
+      setMsg('Error: ' + (r.error ? r.error.message : 'that proposal was already updated elsewhere.'));
+      return;
+    }
     const instruction = [p.title, p.summary, p.implementation_plan || '', BUILD_GUARDRAIL_SENTENCE].join('\n\n');
     const r2 = await supabase.from('worker_tasks').insert({kind:'build', status:'queued', instruction});
     if (r2.error) setMsg('Approved, but failed to queue build: ' + r2.error.message);
@@ -713,13 +766,25 @@ function Upgrades(props) {
 
   async function queueDirective(directive_text, priority) {
     const r = await supabase.from('research_directives').insert({directive_text, priority});
-    setDirectiveMsg(r.error ? 'Error: ' + r.error.message : 'Question queued.');
-    setTimeout(() => setDirectiveMsg(''), 3000);
+    if (r.error) {
+      setDirectiveErr(true);
+      setDirectiveMsg('Error: ' + r.error.message);
+      scheduleDirectiveMsgClear();
+      return false;
+    }
+    setDirectiveErr(false);
+    setDirectiveMsg('Question queued.');
+    scheduleDirectiveMsgClear();
+    return true;
   }
 
-  const visible = filter === 'all' ? proposals : proposals.filter(p => p.status === filter);
+  const visible = filter === 'all' ? proposals
+    : filter === 'other' ? proposals.filter(p => !KNOWN_STATUSES.includes(p.status))
+    : proposals.filter(p => p.status === filter);
   const counts = STATUS_FILTERS.reduce((acc, f) => {
-    acc[f] = f === 'all' ? proposals.length : proposals.filter(p => p.status === f).length;
+    if (f === 'all') acc[f] = proposals.length;
+    else if (f === 'other') acc[f] = proposals.filter(p => !KNOWN_STATUSES.includes(p.status)).length;
+    else acc[f] = proposals.filter(p => p.status === f).length;
     return acc;
   }, {});
 
@@ -728,16 +793,18 @@ function Upgrades(props) {
       STATUS_FILTERS.map(f => h('button', {
         key:f, type:'button', className:'filterbtn' + (filter === f ? ' active' : ''),
         onClick:() => setFilter(f),
-      }, (PROPOSAL_STATUS[f] ? PROPOSAL_STATUS[f].label : 'All') + ' (' + counts[f] + ')'))),
+      }, (PROPOSAL_STATUS[f] ? PROPOSAL_STATUS[f].label : (f === 'other' ? 'Other' : 'All')) + ' (' + counts[f] + ')'))),
     proposals.length ? h('div', {className:'summary'},
       h('span', null, h('b', null, proposals.length), ' total'),
       STATUS_FILTERS.filter(f => f !== 'all').map(f => h('span', {key:f},
-        h('b', null, counts[f]), ' ' + PROPOSAL_STATUS[f].label.toLowerCase()))) : null,
+        h('b', null, counts[f]), ' ' + (PROPOSAL_STATUS[f] ? PROPOSAL_STATUS[f].label : 'Other').toLowerCase()))) : null,
     msg ? h('p', {className:'muted'}, msg) : null,
     visible.map(p => h(UpgradeCard, {key:p.id, p, onDecide:decide, onApprove:approveAndBuild})),
     visible.length === 0 && proposals.length > 0 ? h('p', {className:'muted', style:{padding:'8px 2px'}}, 'No proposals match this filter.') : null,
     h(ResearchDirectiveForm, {onSubmit:queueDirective}),
-    directiveMsg ? h('p', {className:'small', style:{color:'#3ecf8e'}}, directiveMsg) : null);
+    directiveMsg
+      ? (directiveErr ? h('p', {className:'err'}, directiveMsg) : h('p', {className:'small', style:{color:'#3ecf8e'}}, directiveMsg))
+      : null);
 }
 
 function App() {

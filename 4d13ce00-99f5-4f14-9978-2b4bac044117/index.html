@@ -95,7 +95,8 @@ const PROPOSAL_STATUS = {
   done:     {label: 'Done',     color: '#3ecf8e'},
   rejected: {label: 'Rejected', color: '#ff7b72'},
 };
-const STATUS_FILTERS = ['all', 'proposed', 'approved', 'building', 'done', 'rejected'];
+const KNOWN_STATUSES = ['proposed', 'approved', 'building', 'done', 'rejected'];
+const STATUS_FILTERS = ['all', 'proposed', 'approved', 'building', 'done', 'rejected', 'other'];
 // Exact guardrail sentence appended to every "Approve & Build" queued task instruction,
 // per Max's pin. Composed as: title, then summary, then implementation_plan, then this.
 // Demo only below: nothing here inserts into a real worker_tasks table.
@@ -103,14 +104,17 @@ const BUILD_GUARDRAIL_SENTENCE = 'Build this as an app-surface preview only: ';
 
 // ---- DEMO fixture rows (clearly synthetic; stand in for optimization_proposals) ----
 let proposals = [
-  {id:'d1', benefit_type:'ui_improvement', title:'[Demo] Larger tap targets on Tasks cards', summary:'Demo data: several buried buttons on the Tasks tray are hard to hit on small screens; widen the cancel control.', implementation_plan:'[Demo] Increase the .secondary cancel button min-height to 44px and add horizontal padding on the Tasks card.', functionality_score:6, cost_score:2, status:'proposed', created_at:'2025-03-01'},
-  {id:'d2', benefit_type:'efficiency_upgrade', title:'[Demo] Batch preview_tasks polling', summary:'Demo data: combine repeated polling calls into a single batched request to cut redundant round trips.', implementation_plan:'[Demo] Merge the per-task preview_tasks fetch into the existing 5s worker_tasks poll interval.', functionality_score:7, cost_score:3, status:'approved', created_at:'2025-03-02'},
-  {id:'d3', benefit_type:'feature_update', title:'[Demo] Add due-date reminders to Goals', summary:'Demo data: surface a gentle reminder badge when a goal is close to its target date.', implementation_plan:'[Demo] Compute days-until-due client side and render an amber badge on goal boxes within 3 days.', functionality_score:8, cost_score:5, status:'building', created_at:'2025-03-03'},
-  {id:'d4', benefit_type:'new_feature', title:'[Demo] Weekly digest email', summary:'Demo data: send a short weekly summary of new folders and completed goals.', implementation_plan:'[Demo] Add a scheduled edge function that emails a digest every Monday.', functionality_score:9, cost_score:6, status:'done', created_at:'2025-02-20'},
-  {id:'d5', benefit_type:'bug_fix', title:'[Demo] Fix duplicate memory citations', summary:'Demo data: chat replies occasionally cite the same folder twice in the memory line.', implementation_plan:'[Demo] Dedupe the folders array by id before rendering the citation line.', functionality_score:5, cost_score:1, status:'rejected', created_at:'2025-02-18'},
-  {id:'d6', benefit_type:'ui_improvement', title:'[Demo] Dark-mode contrast pass on chips', summary:'Demo data: a few status chips read low-contrast on OLED displays at night.', implementation_plan:'[Demo] Raise chip border/text opacity from 55% to 70% against the #0f1115 background.', functionality_score:4, cost_score:2, status:'proposed', created_at:'2025-03-04'},
-  {id:'d7', benefit_type:'efficiency_upgrade', title:'[Demo] Cache embeddings for repeat queries', summary:'Demo data: identical questions re-embed every time; cache by normalized text for a session.', implementation_plan:'[Demo] Add an in-memory Map keyed by normalized query text for the session lifetime.', functionality_score:6, cost_score:4, status:'proposed', created_at:'2025-03-05'},
-  {id:'d8', benefit_type:'new_feature', title:'[Demo] Shareable goal roadmap link', summary:'Demo data: let a user export a read-only link to their goal path for an accountability partner.', implementation_plan:'[Demo] Generate a signed read-only token that renders a stripped-down Goals view.', functionality_score:7, cost_score:7, status:'approved', created_at:'2025-02-27'},
+  {id:'d1', benefit_type:'ui_improvement', title:'[Demo] Larger tap targets on Tasks cards', summary:'Demo data: several buried buttons on the Tasks tray are hard to hit on small screens; widen the cancel control.', implementation_plan:'[Demo] Increase the .secondary cancel button min-height to 44px and add horizontal padding on the Tasks card.', functionality_score:6, cost_score:2, priority:4, status:'proposed', created_at:'2025-03-01'},
+  {id:'d2', benefit_type:'efficiency_upgrade', title:'[Demo] Batch preview_tasks polling', summary:'Demo data: combine repeated polling calls into a single batched request to cut redundant round trips.', implementation_plan:'[Demo] Merge the per-task preview_tasks fetch into the existing 5s worker_tasks poll interval.', functionality_score:7, cost_score:3, priority:4, status:'approved', created_at:'2025-03-02'},
+  {id:'d3', benefit_type:'feature_update', title:'[Demo] Add due-date reminders to Goals', summary:'Demo data: surface a gentle reminder badge when a goal is close to its target date.', implementation_plan:'[Demo] Compute days-until-due client side and render an amber badge on goal boxes within 3 days.', functionality_score:8, cost_score:5, priority:3, status:'building', created_at:'2025-03-03'},
+  {id:'d4', benefit_type:'new_feature', title:'[Demo] Weekly digest email', summary:'Demo data: send a short weekly summary of new folders and completed goals.', implementation_plan:'[Demo] Add a scheduled edge function that emails a digest every Monday.', functionality_score:9, cost_score:6, priority:3, status:'done', created_at:'2025-02-20'},
+  {id:'d5', benefit_type:'bug_fix', title:'[Demo] Fix duplicate memory citations', summary:'Demo data: chat replies occasionally cite the same folder twice in the memory line.', implementation_plan:'[Demo] Dedupe the folders array by id before rendering the citation line.', functionality_score:5, cost_score:1, priority:4, status:'rejected', created_at:'2025-02-18'},
+  {id:'d6', benefit_type:'ui_improvement', title:'[Demo] Dark-mode contrast pass on chips', summary:'Demo data: a few status chips read low-contrast on OLED displays at night.', implementation_plan:'[Demo] Raise chip border/text opacity from 55% to 70% against the #0f1115 background.', functionality_score:4, cost_score:2, priority:2, status:'proposed', created_at:'2025-03-04'},
+  {id:'d7', benefit_type:'efficiency_upgrade', title:'[Demo] Cache embeddings for repeat queries', summary:'Demo data: identical questions re-embed every time; cache by normalized text for a session.', implementation_plan:'[Demo] Add an in-memory Map keyed by normalized query text for the session lifetime.', functionality_score:6, cost_score:4, priority:2, status:'proposed', created_at:'2025-03-05'},
+  {id:'d8', benefit_type:'new_feature', title:'[Demo] Shareable goal roadmap link', summary:'Demo data: let a user export a read-only link to their goal path for an accountability partner.', implementation_plan:'[Demo] Generate a signed read-only token that renders a stripped-down Goals view.', functionality_score:7, cost_score:7, priority:0, status:'approved', created_at:'2025-02-27'},
+  {id:'d9', benefit_type:'ui_improvement', title:'[Demo] Archived idea: skeuomorphic icons', summary:'Demo data: illustrates a status value outside the five known states - it is bucketed under the "Other" filter so counts still sum to the total.', implementation_plan:'[Demo] N/A - archived.', functionality_score:3, cost_score:2, priority:1, status:'archived', created_at:'2025-01-10'},
+  {id:'d10', benefit_type:'efficiency_upgrade', title:'[Demo] Scoring still pending', summary:'Demo data: cost_score has not been set yet, so the meters and priority line are hidden until both scores exist.', implementation_plan:'[Demo] N/A - awaiting review.', functionality_score:7, cost_score:null, priority:null, status:'proposed', created_at:'2025-03-06'},
+  {id:'d11', benefit_type:'legacy_cleanup', title:'[Demo] Retire unused feature-flag table', summary:'Demo data: benefit_type values outside the five known categories still render their raw string, never a blank chip.', implementation_plan:'[Demo] Drop the deprecated flags table after confirming no reads remain.', functionality_score:4, cost_score:3, priority:1, status:'proposed', created_at:'2025-03-07'},
 ];
 let directives = [
   {id:'r1', directive_text:'[Demo] How do other note apps handle atomic idea splitting?', priority:3},
@@ -118,6 +122,13 @@ let directives = [
 let currentFilter = 'all';
 let directiveMsg = '';
 let actionMsg = '';
+// Single status-message timer "ref" (this preview has no React refs, so a plain
+// module-level handle stands in for one): always cleared before a new message is
+// scheduled, and cleared when the user navigates away from Upgrades (unmount).
+let msgTimer = null;
+function clearMsgTimer() {
+  if (msgTimer) { clearTimeout(msgTimer); msgTimer = null; }
+}
 
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
@@ -135,6 +146,7 @@ function renderMenu() {
   Array.prototype.forEach.call(items.querySelectorAll('[data-view]'), function(btn) {
     btn.addEventListener('click', function() {
       currentView = btn.getAttribute('data-view');
+      if (currentView !== 'upgrades') clearMsgTimer(); // leaving Upgrades = "unmount"
       document.getElementById('menuDropdown').style.display = 'none';
       document.getElementById('menuBtn').setAttribute('aria-expanded', 'false');
       renderMenu();
@@ -149,15 +161,28 @@ function renderStub(label) {
 }
 
 function proposalCardHtml(p) {
-  const benefit = BENEFIT_TYPES[p.benefit_type] || {label: p.benefit_type, color: '#9aa3ad'};
+  // Benefit chip fallback: raw benefit_type string, or 'unknown' if the field
+  // itself is missing/blank - the chip must never render empty.
+  const benefit = BENEFIT_TYPES[p.benefit_type] || {label: (p.benefit_type || 'unknown'), color: '#9aa3ad'};
   const status = PROPOSAL_STATUS[p.status] || {label: p.status, color: '#9aa3ad'};
-  const priority = p.functionality_score - p.cost_score;
+  // Scores render as (value ?? '-')/10; meters and the priority line are hidden
+  // whenever either score is null, and priority is the DB column, never recomputed.
+  const hasScores = p.functionality_score != null && p.cost_score != null;
+  const funcTxt = (p.functionality_score == null ? '-' : p.functionality_score) + '/10';
+  const costTxt = (p.cost_score == null ? '-' : p.cost_score) + '/10';
   const actions = p.status === 'proposed'
     ? '<div class="upgrade-actions">' +
         '<button type="button" data-approve="' + p.id + '">Approve &amp; Build</button>' +
         '<button type="button" class="reject-btn" data-reject="' + p.id + '">Reject</button>' +
       '</div>'
     : '';
+  const scoreRow = '<div class="score-row">' +
+      '<div class="score-col"><div class="score-label"><span>Functionality</span><span>' + funcTxt + '</span></div>' +
+        (hasScores ? '<div class="meter"><div style="width:' + (p.functionality_score*10) + '%;background:#3ecf8e"></div></div>' : '') + '</div>' +
+      '<div class="score-col"><div class="score-label"><span>Cost</span><span>' + costTxt + '</span></div>' +
+        (hasScores ? '<div class="meter"><div style="width:' + (p.cost_score*10) + '%;background:#e0a458"></div></div>' : '') + '</div>' +
+    '</div>';
+  const priorityLine = hasScores ? '<div class="priority-num">Priority score: <b>' + (p.priority == null ? '-' : p.priority) + '</b></div>' : '';
   return '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
       '<span class="chip" style="background:' + benefit.color + '22;color:' + benefit.color + ';border-color:' + benefit.color + '55">' + escapeHtml(benefit.label) + '</span>' +
@@ -165,32 +190,34 @@ function proposalCardHtml(p) {
     '</div>' +
     '<p style="font-size:15px;font-weight:700;margin:10px 0 2px">' + escapeHtml(p.title) + '</p>' +
     '<p class="small" style="font-size:13.5px;color:#c7ccd3;margin:2px 0 0">' + escapeHtml(p.summary) + '</p>' +
-    '<div class="score-row">' +
-      '<div class="score-col"><div class="score-label"><span>Functionality</span><span>' + p.functionality_score + '/10</span></div>' +
-        '<div class="meter"><div style="width:' + (p.functionality_score*10) + '%;background:#3ecf8e"></div></div></div>' +
-      '<div class="score-col"><div class="score-label"><span>Cost</span><span>' + p.cost_score + '/10</span></div>' +
-        '<div class="meter"><div style="width:' + (p.cost_score*10) + '%;background:#e0a458"></div></div></div>' +
-    '</div>' +
-    '<div class="priority-num">Priority score: <b>' + priority + '</b></div>' +
+    scoreRow +
+    priorityLine +
     actions +
   '</div>';
 }
 
 function renderUpgrades() {
+  // Statuses outside KNOWN_STATUSES fall into the 'other' bucket so per-status
+  // counts always sum to the total, however proposals.status is populated.
   const counts = {};
   STATUS_FILTERS.forEach(function(f) {
-    counts[f] = f === 'all' ? proposals.length : proposals.filter(function(p){ return p.status === f; }).length;
+    if (f === 'all') counts[f] = proposals.length;
+    else if (f === 'other') counts[f] = proposals.filter(function(p){ return KNOWN_STATUSES.indexOf(p.status) === -1; }).length;
+    else counts[f] = proposals.filter(function(p){ return p.status === f; }).length;
   });
-  const visible = currentFilter === 'all' ? proposals : proposals.filter(function(p){ return p.status === currentFilter; });
+  const visible = currentFilter === 'all' ? proposals
+    : currentFilter === 'other' ? proposals.filter(function(p){ return KNOWN_STATUSES.indexOf(p.status) === -1; })
+    : proposals.filter(function(p){ return p.status === currentFilter; });
 
   const filterHtml = '<div class="filterbar">' + STATUS_FILTERS.map(function(f) {
-    const label = (PROPOSAL_STATUS[f] ? PROPOSAL_STATUS[f].label : 'All') + ' (' + counts[f] + ')';
+    const label = (PROPOSAL_STATUS[f] ? PROPOSAL_STATUS[f].label : (f === 'other' ? 'Other' : 'All')) + ' (' + counts[f] + ')';
     return '<button type="button" class="filterbtn' + (currentFilter === f ? ' active' : '') + '" data-filter="' + f + '">' + escapeHtml(label) + '</button>';
   }).join('') + '</div>';
 
   const summaryHtml = proposals.length ? '<div class="summary"><span><b>' + proposals.length + '</b> total</span>' +
     STATUS_FILTERS.filter(function(f){ return f !== 'all'; }).map(function(f) {
-      return '<span><b>' + counts[f] + '</b> ' + PROPOSAL_STATUS[f].label.toLowerCase() + '</span>';
+      const label = PROPOSAL_STATUS[f] ? PROPOSAL_STATUS[f].label : 'Other';
+      return '<span><b>' + counts[f] + '</b> ' + label.toLowerCase() + '</span>';
     }).join('') + '</div>' : '';
 
   const listHtml = visible.length
@@ -251,8 +278,9 @@ function wireUpgradesEvents() {
       const priority = Number(document.getElementById('directivePriority').value);
       directives = [{id:'r' + Date.now(), directive_text: text, priority: priority}, ...directives];
       directiveMsg = 'Question queued (demo only - not saved to a real table).';
+      clearMsgTimer();
       renderUpgrades();
-      setTimeout(function() { directiveMsg = ''; }, 3000);
+      msgTimer = setTimeout(function() { directiveMsg = ''; msgTimer = null; renderUpgrades(); }, 3000);
     });
   }
 }
@@ -274,8 +302,9 @@ function approveAndBuild(id) {
   const instruction = [p.title, p.summary, p.implementation_plan || '', BUILD_GUARDRAIL_SENTENCE].join('\n\n');
   console.log('[demo] would insert worker_tasks row:', {kind: 'build', status: 'queued', instruction: instruction});
   actionMsg = 'Approved. Build task queued (demo only - not sent to a real worker).';
+  clearMsgTimer();
   renderUpgrades();
-  setTimeout(function() { actionMsg = ''; renderUpgrades(); }, 3500);
+  msgTimer = setTimeout(function() { actionMsg = ''; msgTimer = null; renderUpgrades(); }, 3500);
 }
 
 function renderView() {
@@ -305,7 +334,7 @@ renderView();
 </script>
 
 <!-- alleah-overlay-start -->
-<meta name="preview-rev" content="4d13ce00-r2-1785623030">
+<meta name="preview-rev" content="4d13ce00-r3-1785665653">
 <style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
    All classes prefixed apo- to avoid colliding with app styles. */
 
@@ -465,7 +494,7 @@ renderView();
 .apo-log-rev { color: #8a8478; font-size: 11px; }
 .apo-hidden { display: none; }
 </style>
-<script type="application/json" id="alleah-pin-config">{"task_id": "4d13ce00-99f5-4f14-9978-2b4bac044117", "revision": 2, "deploy_marker": "4d13ce00-r2-1785623030", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": [{"revision": 1, "note": "Remove staged/006_upgrades.sql entirely - the tables it creates (optimization_proposals, research_directives) already exist in production with the correct RLS policies from an earlier applied migration; this feature requires zero schema changes. Delete that one staged file and change nothing else.", "resolution": "resolved"}, {"revision": 1, "note": "Change the Approve button on proposal cards (visible when status is 'proposed') into 'Approve & Build': on tap, show a confirm dialog ('Approve and queue a build task (~$2 cap)?'); on confirm (1) update the row to status 'approved', (2) insert a worker_tasks row via the supabase client with kind 'build', status 'queued', and instruction composed as: the proposal title, then the summary, then the implementation_plan, then this exact guardrail sentence: 'Build this as an app-surface preview only: ", "resolution": "resolved"}]}</script>
+<script type="application/json" id="alleah-pin-config">{"task_id": "4d13ce00-99f5-4f14-9978-2b4bac044117", "revision": 3, "deploy_marker": "4d13ce00-r3-1785665653", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": [{"revision": 1, "note": "Remove staged/006_upgrades.sql entirely - the tables it creates (optimization_proposals, research_directives) already exist in production with the correct RLS policies from an earlier applied migration; this feature requires zero schema changes. Delete that one staged file and change nothing else.", "resolution": "resolved"}, {"revision": 2, "note": "Change the Approve button on proposal cards (visible when status is 'proposed') into 'Approve & Build': on tap, show a confirm dialog ('Approve and queue a build task (~$2 cap)?'); on confirm (1) update the row to status 'approved', (2) insert a worker_tasks row via the supabase client with kind 'build', status 'queued', and instruction composed as: the proposal title, then the summary, then the implementation_plan, then this exact guardrail sentence: 'Build this as an app-surface preview only: ", "resolution": "resolved"}, {"revision": 2, "note": "Harden the Upgrades view mutations (applies to staged; mirror in demo with fixtures): (1) every status update must chain .select() and treat zero returned rows as FAILURE - roll back the optimistic change for THAT ROW ONLY (functional per-row rollback, never a whole-array snapshot) and show an error; (2) add .eq('status','proposed') guard to Approve/Reject updates so stale cards cannot clobber pipeline transitions; (3) the directive form only clears its fields on confirmed success - on failure k", "resolution": "resolved"}, {"revision": 2, "note": "SUPERSEDES the earlier 8-part hardening pin: that large pin is replaced by the granular pins in this batch - manifest it as SKIPPED (superseded by granular pins).", "resolution": "resolved"}, {"revision": 2, "note": "Upgrades view: every status update must chain .select() and treat zero returned rows as failure - show an error instead of leaving the optimistic change.", "resolution": "resolved"}, {"revision": 2, "note": "Upgrades view: on a failed status update, roll back only that row (functional update using the row's prior status), never restore a whole-array snapshot.", "resolution": "resolved"}, {"revision": 2, "note": "Upgrades view: add .eq('status','proposed') to the Approve/Reject update so a stale card cannot overwrite a row the pipeline already moved.", "resolution": "resolved"}, {"revision": 2, "note": "Directive form: only clear the text and priority fields after a confirmed successful insert; on failure keep the user's text and show the error in the red .err style, not green.", "resolution": "resolved"}, {"revision": 2, "note": "Upgrade cards: render scores as (value ?? '-')/10, hide the meters and priority line when either score is null, and show the DB priority column value instead of recomputing it.", "resolution": "resolved"}, {"revision": 2, "note": "Proposals query: order by priority descending with nullsFirst:false, add .limit(100), and select only the columns the view renders.", "resolution": "resolved"}, {"revision": 2, "note": "Filters: statuses outside the known set go into an 'Other' bucket so per-status counts always sum to the total.", "resolution": "resolved"}, {"revision": 2, "note": "Benefit chip: fallback label is the raw benefit_type string or 'unknown' - never a blank pill. Also manage the status-message timer with a ref cleared on new submissions and on unmount.", "resolution": "resolved"}]}</script>
 <script>/* Alleah preview pin overlay.
    Injected INLINE into bundle HTML by the worker at bundle time, together with
    a JSON config block in a script tag with id "alleah-pin-config" and type
