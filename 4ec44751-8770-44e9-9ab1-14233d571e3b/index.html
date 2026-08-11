@@ -1,0 +1,1054 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah — chat error states (preview)</title>
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#0f1115;color:#e6e6e6;font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px}
+h1{font-size:18px;margin:0}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:#3ecf8e;color:#08130d;border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:#1a1d23;border:1px solid #2c313a;border-bottom-left-radius:4px}
+.cites{align-self:flex-start;font-size:12px;color:#9aa3ad;margin-top:-4px;padding:0 6px}
+.recovery-note{align-self:flex-start;font-size:12px;color:#e0a458;font-style:italic;margin-top:-4px;padding:0 6px}
+.composer{display:flex;gap:8px;padding:10px 14px 6px}
+textarea{flex:1;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:120px}
+button{background:#3ecf8e;color:#08130d;border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:#2c313a;color:#e6e6e6;font-size:13px;padding:6px 12px;border-radius:8px}
+button.stop-btn{background:#ff7b72;color:#2b0d0b}
+button:disabled{opacity:.5}
+.muted{color:#9aa3ad;font-size:14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid #2c313a}
+.dot{width:8px;height:8px;border-radius:50%}
+.card{background:#12151a;border:1px solid #2c313a;border-radius:12px;padding:12px 14px;margin:10px 0}
+.small{font-size:12px;color:#9aa3ad;margin:2px 0}
+.menu-wrap{position:relative}
+.menu-btn{width:46px;height:46px;background:#1a1d23;color:#e6e6e6;border:1px solid #2c313a;border-radius:12px;padding:0;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu-btn[aria-expanded="true"]{background:#2c313a;border-color:#3ecf8e}
+.menu-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:200px;background:#1a1d23;border:1px solid #2c313a;border-radius:16px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:30}
+.menu-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9aa3ad;padding:10px 12px 6px}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;background:transparent;color:#e6e6e6;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;text-align:left;cursor:pointer}
+.menu-item:active{background:#2c313a}
+.menu-item.active{background:#3ecf8e;color:#08130d;font-weight:700}
+.upgrade-actions{display:flex;gap:8px;margin-top:10px}
+.upgrade-actions button{flex:1;padding:8px 0}
+.msg.pending{display:flex;flex-direction:column;gap:4px}
+.stream-wrap{display:grid}
+.stream-wrap>*{grid-area:1/1}
+.think-row{display:inline-flex;align-items:center;gap:8px;transition:opacity .25s ease}
+.think-row.fade-out{opacity:0}
+.think-label{font-size:13px;color:#9aa3ad}
+.think-dots{display:inline-flex;gap:5px;padding:4px 2px;align-items:center}
+.think-dot{font-size:16px;line-height:1;color:#9aa3ad;animation:think-bounce 1.1s infinite ease-in-out}
+@keyframes think-bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+.stream-text{opacity:0;transition:opacity .25s ease;white-space:pre-wrap;word-wrap:break-word}
+.stream-text.show{opacity:1}
+.stream-cursor{display:inline-block;width:2px;height:1em;background:#9aa3ad;vertical-align:text-bottom;margin-left:1px;animation:cursor-blink 1s step-start infinite}
+@keyframes cursor-blink{50%{opacity:0}}
+.interrupted-note{font-size:12px;color:#e0a458;font-style:italic;margin-top:2px}
+/* ===== Typed chat-error states ===== */
+.chat-error{align-self:flex-start;max-width:92%;background:#1d1613;border:1px solid #5c3a2e;border-radius:16px;border-bottom-left-radius:4px;padding:12px 14px}
+.chat-error-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.chat-error-icon{font-size:16px;line-height:1}
+.chat-error-title{font-weight:700;font-size:14px;color:#ff9d7a}
+.chat-error-reason{font-size:13px;color:#c7ccd3;margin:2px 0 10px;line-height:1.4}
+.errfreq-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1a1d23;font-size:13px;color:#c7ccd3}
+.errfreq-row:last-child{border-bottom:none}
+/* ===== Preview-only demo harness — visually distinct from real app chrome ===== */
+.demo-strip{margin:0 14px 8px;padding:8px 10px;border:1px dashed #3a4048;border-radius:12px;background:#141820}
+.demo-strip .demo-label{font-size:11px;color:#9aa3ad;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.demo-chips{display:flex;gap:6px;flex-wrap:wrap}
+.demo-chip{background:#1a1d23;color:#c7ccd3;border:1px solid #2c313a;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer}
+.demo-chip:hover{border-color:#58a6ff}
+.demo-chip:disabled{opacity:.4;cursor:default}
+</style></head><body>
+<div id="root"></div>
+<script>
+// ===== Preview note =====
+// This is a static, self-contained preview of ONE feature: typed, actionable
+// chat-error states. There is no backend here - all data is inline synthetic
+// fixtures and every "network request" below is a setTimeout-simulated delay.
+// The classification / recovery-action logic mirrors what the real app's
+// client would run against real fetch failures and the ask Edge Function's
+// error responses.
+
+function el(tag, attrs, children) {
+  const node = document.createElement(tag);
+  attrs = attrs || {};
+  Object.keys(attrs).forEach(function (k) {
+    if (k === 'text') node.textContent = attrs[k];
+    else if (k === 'html') node.innerHTML = attrs[k];
+    else if (k === 'className') node.className = attrs[k];
+    else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+    else if (k === 'style') Object.assign(node.style, attrs[k]);
+    else if (k === 'disabled') { if (attrs[k]) node.setAttribute('disabled', ''); }
+    else node.setAttribute(k, attrs[k]);
+  });
+  (children || []).forEach(function (c) { if (c) node.appendChild(c); });
+  return node;
+}
+function text(s) { return document.createTextNode(s); }
+
+// ===== Typed chat-error catalogue =====
+// One entry per failure mode called out in the proposal: network drop, rate
+// limit, context-window exceeded, model timeout - plus an "unknown" bucket
+// for anything that doesn't match, so the UI never falls back to a bare
+// generic message even when classification can't pin the exact cause.
+const ERROR_TYPES = {
+  network: {
+    icon: '📡', title: 'Connection dropped',
+    reason: "Your message may not have reached Alleah, or her reply never made it back.",
+    action: 'Try again', thinkingLabel: 'Thinking',
+  },
+  rate_limit: {
+    icon: '⏳', title: 'Rate limit reached',
+    reason: "The model is getting more requests than it can handle right now.",
+    action: 'Switch model', thinkingLabel: 'Switching model',
+  },
+  context_window: {
+    icon: '✂️', title: 'Conversation too long',
+    reason: "This thread carries more context than the model can take in one request.",
+    action: 'Shorten prompt', thinkingLabel: 'Shortening prompt',
+  },
+  model_timeout: {
+    icon: '⌛', title: 'Model took too long',
+    reason: "No response arrived in time, so the request was cancelled.",
+    action: 'Try again', thinkingLabel: 'Thinking',
+  },
+  unknown: {
+    icon: '⚠️', title: 'Something went wrong',
+    reason: "That request failed for an unclear reason.",
+    action: 'Try again', thinkingLabel: 'Thinking',
+  },
+};
+
+// Same shape/logic the real ask Edge Function and its client use: classify a
+// raw failure (a caught fetch exception, or the error string an API returned)
+// into one of the buckets above. Kept faithful here (rather than hard-coding
+// the outcome per demo button) so the preview genuinely exercises the
+// classifier, not just canned UI states.
+function classifyError(opts) {
+  opts = opts || {};
+  if (opts.timedOut) return 'model_timeout';
+  const m = String(opts.message || '').toLowerCase();
+  if (!m) return 'network';
+  if (/failed to fetch|networkerror|load failed|net::|typeerror/.test(m)) return 'network';
+  if (/rate_limit_error|rate limit/.test(m)) return 'rate_limit';
+  if (/prompt is too long|context_length_exceeded|maximum context|too many tokens|context length/.test(m)) return 'context_window';
+  if (/overloaded_error|timed out|timeout|gateway|\b529\b|\b504\b/.test(m)) return 'model_timeout';
+  return 'unknown';
+}
+
+// Fixture raw payloads, shaped like what the real backend/network layer would
+// actually hand back for each failure mode - run through classifyError() below
+// rather than the outcome being hard-wired to the demo button that triggered it.
+const FIXTURE_RAW_ERRORS = {
+  network: { message: null },
+  rate_limit: { message: 'Claude API: {"type":"error","error":{"type":"rate_limit_error","message":"Number of requests has exceeded your rate limit."}}' },
+  context_window: { message: 'Claude API: {"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 214532 tokens > 200000 maximum"}}' },
+  model_timeout: { timedOut: true },
+};
+
+const DEMO_PROMPTS = {
+  network: "Pull the full itinerary doc from the shared drive and rewrite it for altitude pacing.",
+  rate_limit: "Give me a full breakdown of every gear item, cost, and supplier for the trip.",
+  context_window: "Given everything we've discussed across all my planning conversations this month, write the complete consolidated plan.",
+  model_timeout: "Write an exhaustive contingency plan covering every possible failure mode for the trip.",
+};
+
+const RECOVERY_REPLIES = {
+  network: "Reconnected — here's the pacing rewrite: mornings at altitude first, buffer day before the summit push, and the shared-drive doc is synced in as [1].",
+  rate_limit: "Here's the gear breakdown: shell, boots, and stove are the three big-ticket items; everything else is under $60 and already on your list [1].",
+  context_window: "Consolidated plan, working from the most recent turns: prep this week, gear check next, weather call 48h out.",
+  model_timeout: "Contingency plan, top three branches: weather delay, gear failure, and a pace slip past the checkpoint — each with a fallback.",
+};
+
+const CANNED_REPLIES = [
+  "Noted — filed that under the trip planning thread. Anything else you want pinned down?",
+  "Got it. That lines up with what you said about the schedule earlier [1].",
+  "Makes sense. Want me to fold that into the itinerary or keep it separate for now?",
+];
+
+const SEED_MESSAGES = [
+  { role: 'user', content: "Can you help me plan my week around the Denali trip prep?" },
+  { role: 'assistant', content: "Sure — from what you've told me, the big blockers are the gear shakedown and the permit paperwork. Want to tackle the gear list first, or the paperwork while it's fresh?", folders: [{ n: 1, title: 'Denali trip prep' }] },
+  { role: 'user', content: "Gear list first. I already have boots and a shell." },
+  { role: 'assistant', content: "Good start. That leaves the stove, fuel, and the altitude tent as the open items — want me to keep tracking this as we go?", folders: [{ n: 1, title: 'Denali trip prep' }] },
+];
+
+// ===== Session-only "error frequency" log =====
+// Namespaced under alleah_preview_* (never alleah_chat_v1 etc.) so this static
+// preview can never collide with real app storage if ever opened on the same
+// origin. Mirrors the real feature's step 4: log error-type frequency so it
+// can inform future prioritization - surfaced here as a small summary card
+// in the Upgrades view, exactly where that prioritization conversation happens.
+const ERROR_LOG_KEY = 'alleah_preview_chat_error_log_v1';
+function loadErrorLog() {
+  try { return JSON.parse(localStorage.getItem(ERROR_LOG_KEY)) || {}; } catch (e) { return {}; }
+}
+function bumpErrorLog(type) {
+  const log = loadErrorLog();
+  log[type] = (log[type] || 0) + 1;
+  localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+  return log;
+}
+
+const state = {
+  view: 'chat',
+  messages: SEED_MESSAGES.slice(),
+  pending: null, // {phase:'thinking'|'crossfade'|'streaming'|'interrupted'|'error', ...}
+  text: '',
+  menuOpen: false,
+  errorLog: loadErrorLog(),
+};
+
+const MIN_THINK_MS = 550;
+const CROSSFADE_MS = 250;
+const REVEAL_MS = 700; // simulated streaming duration for the canned reply
+
+function isGenerating() {
+  const p = state.pending;
+  return !!p && p.phase !== 'interrupted' && p.phase !== 'error';
+}
+
+// ===== Rendering =====
+const root = document.getElementById('root');
+
+function render() {
+  root.innerHTML = '';
+  root.appendChild(renderHeader());
+  if (state.view === 'upgrades') {
+    root.appendChild(renderUpgrades());
+  } else {
+    root.appendChild(renderThread());
+    root.appendChild(renderDemoStrip());
+    root.appendChild(renderComposer());
+  }
+}
+
+function renderHeader() {
+  const menuBtn = el('button', {
+    type: 'button', className: 'menu-btn', 'aria-haspopup': 'menu',
+    'aria-expanded': String(state.menuOpen), 'aria-label': state.menuOpen ? 'Close menu' : 'Open menu',
+    onclick: function (e) { e.stopPropagation(); state.menuOpen = !state.menuOpen; render(); },
+  }, [text('☰')]);
+  const wrap = el('div', { className: 'menu-wrap' }, [menuBtn]);
+  if (state.menuOpen) {
+    const dropdown = el('div', { className: 'menu-dropdown', role: 'menu' }, [
+      el('div', { className: 'menu-label', text: 'View' }),
+      el('button', {
+        type: 'button', role: 'menuitem',
+        className: 'menu-item' + (state.view === 'chat' ? ' active' : ''),
+        onclick: function () { state.view = 'chat'; state.menuOpen = false; render(); },
+        text: 'Chat',
+      }),
+      el('button', {
+        type: 'button', role: 'menuitem',
+        className: 'menu-item' + (state.view === 'upgrades' ? ' active' : ''),
+        onclick: function () { state.view = 'upgrades'; state.menuOpen = false; render(); },
+        text: 'Upgrades',
+      }),
+    ]);
+    wrap.appendChild(dropdown);
+  }
+  return el('header', null, [
+    el('h1', { text: 'Alleah' }),
+    wrap,
+  ]);
+}
+
+document.addEventListener('mousedown', function (e) {
+  if (state.menuOpen && !e.target.closest('.menu-wrap')) { state.menuOpen = false; render(); }
+});
+
+function renderThinkingDots(label, fading) {
+  return el('div', {
+    className: 'think-row' + (fading ? ' fade-out' : ''), role: 'status', 'aria-live': 'polite',
+    'aria-label': label + ' — Alleah is working',
+  }, [
+    el('span', { className: 'think-label', text: label }),
+    el('span', { className: 'think-dots' }, [
+      el('span', { className: 'think-dot', style: { animationDelay: '0s' }, text: '\u2022' }),
+      el('span', { className: 'think-dot', style: { animationDelay: '.15s' }, text: '\u2022' }),
+      el('span', { className: 'think-dot', style: { animationDelay: '.3s' }, text: '\u2022' }),
+    ]),
+  ]);
+}
+
+// The one card per typed failure: what happened, a one-line reason, exactly
+// one recovery action. Rendered inline in the thread where the pending
+// assistant bubble would have gone - never a floating toast.
+function renderChatError(p) {
+  const cfg = ERROR_TYPES[p.errorType] || ERROR_TYPES.unknown;
+  return el('div', { className: 'chat-error', role: 'alert', 'data-error-type': p.errorType }, [
+    el('div', { className: 'chat-error-head' }, [
+      el('span', { className: 'chat-error-icon', text: cfg.icon }),
+      el('span', { className: 'chat-error-title', text: cfg.title }),
+    ]),
+    el('p', { className: 'chat-error-reason', text: cfg.reason }),
+    el('button', { type: 'button', className: 'secondary chat-error-action', onclick: onErrorAction, text: cfg.action }),
+  ]);
+}
+
+function renderPendingBubble(p) {
+  if (p.phase === 'error') return renderChatError(p);
+  if (p.phase === 'interrupted') {
+    const hasPartial = !!(p.revealed && p.revealed.length);
+    const box = el('div', { className: 'msg assistant pending', 'data-phase': p.phase }, [
+      hasPartial ? el('span', { text: p.revealed }) : null,
+      el('div', { className: 'interrupted-note', text: hasPartial ? 'Generation stopped.' : 'Stopped before generating a response.' }),
+    ]);
+    const actions = el('div', { className: 'upgrade-actions' }, [
+      el('button', { type: 'button', className: 'secondary', onclick: regenerate, text: 'Regenerate' }),
+    ]);
+    box.appendChild(actions);
+    return box;
+  }
+  const showDots = p.phase === 'thinking' || p.phase === 'crossfade';
+  const showText = p.phase === 'crossfade' || p.phase === 'streaming';
+  const streamWrap = el('div', { className: 'stream-wrap' }, [
+    showDots ? renderThinkingDots(p.thinkingLabel || 'Thinking', p.phase === 'crossfade') : null,
+    showText ? el('span', { className: 'stream-text show' }, [text(p.revealed || ''), el('span', { className: 'stream-cursor' })]) : null,
+  ]);
+  return el('div', { className: 'msg assistant pending', 'data-phase': p.phase }, [streamWrap]);
+}
+
+function renderThread() {
+  const thread = el('div', { id: 'thread' });
+  if (!state.messages.length) {
+    thread.appendChild(el('p', { className: 'muted', style: { padding: '0 6px' }, text: 'Talk to me. What you tell me about what you know gets remembered - automatically.' }));
+  }
+  state.messages.forEach(function (m) {
+    thread.appendChild(el('div', { className: 'msg ' + m.role, text: m.content }));
+    if (m.folders && m.folders.length) {
+      thread.appendChild(el('div', { className: 'cites', text: 'memory: ' + m.folders.map(function (f) { return '[' + f.n + '] ' + f.title; }).join('  ') }));
+    }
+    if (m.note) thread.appendChild(el('div', { className: 'recovery-note', text: m.note }));
+  });
+  if (state.pending) thread.appendChild(renderPendingBubble(state.pending));
+  const endMarker = el('div');
+  thread.appendChild(endMarker);
+  setTimeout(function () { endMarker.scrollIntoView({ behavior: 'smooth' }); }, 0);
+  return thread;
+}
+
+function renderComposer() {
+  const ta = el('textarea', {
+    placeholder: 'Message Alleah...', rows: '1',
+    oninput: function (e) { state.text = e.target.value; },
+    onkeydown: function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } },
+  });
+  ta.value = state.text;
+  const generating = isGenerating();
+  const btn = generating
+    ? el('button', { type: 'button', className: 'stop-btn', onclick: stop, text: 'Stop' })
+    : el('button', { disabled: !state.text.trim(), onclick: send, text: 'Send' });
+  return el('div', { className: 'composer' }, [ta, btn]);
+}
+
+function renderDemoStrip() {
+  const disabled = isGenerating();
+  const chip = function (type, label) {
+    return el('button', {
+      type: 'button', className: 'demo-chip', disabled: disabled,
+      onclick: function () { sendDemo(type); }, text: label,
+    });
+  };
+  return el('div', { className: 'demo-strip' }, [
+    el('div', { className: 'demo-label', text: 'Preview demo — simulate a chat failure' }),
+    el('div', { className: 'demo-chips' }, [
+      chip('network', '📡 Network drop'),
+      chip('rate_limit', '⏳ Rate limit'),
+      chip('context_window', '✂️ Context exceeded'),
+      chip('model_timeout', '⌛ Model timeout'),
+    ]),
+  ]);
+}
+
+function renderUpgrades() {
+  const wrap = el('div', { id: 'upgrades' });
+  const counts = state.errorLog;
+  const entries = Object.keys(counts).map(function (k) { return [k, counts[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
+  if (entries.length) {
+    const total = entries.reduce(function (s, e) { return s + e[1]; }, 0);
+    const card = el('div', { className: 'card' }, [
+      el('p', { style: { fontSize: '14px', fontWeight: '700', margin: '0 0 8px' }, text: 'Chat error frequency' }),
+      el('p', { className: 'small', style: { margin: '0 0 8px' }, text: total + ' logged chat failure' + (total === 1 ? '' : 's') + ' this session - informs which error type to prioritize next.' }),
+    ]);
+    entries.forEach(function (e) {
+      const cfg = ERROR_TYPES[e[0]] || ERROR_TYPES.unknown;
+      const row = el('div', { className: 'errfreq-row' }, [
+        el('span', { text: cfg.title }),
+        el('span', null, [el('b', { style: { color: '#e6e6e6' }, text: String(e[1]) })]),
+      ]);
+      card.appendChild(row);
+    });
+    wrap.appendChild(card);
+  } else {
+    wrap.appendChild(el('p', { className: 'muted', style: { padding: '8px 2px' }, text: 'No chat errors logged yet. Trigger one from the demo strip on the Chat tab to see it counted here.' }));
+  }
+  wrap.appendChild(el('div', { className: 'card' }, [
+    el('p', { style: { fontSize: '14px', fontWeight: '700', margin: '0 0 6px' }, text: 'Specific, actionable error states for chat failures' }),
+    el('p', { className: 'small', style: { margin: 0 }, text: 'Approved upgrade: replaces the old generic "Something went wrong" message with typed states (network drop, rate limit, context-window exceeded, model timeout), each with a one-line reason and a single recovery action, shown inline next to the failed message.' }),
+  ]));
+  return wrap;
+}
+
+// ===== Send / error / recovery flow =====
+
+function finalizeMessage(note) {
+  const p = state.pending;
+  if (!p) return;
+  state.messages.push({ role: 'assistant', content: p.fullAnswer, folders: p.folders || [], note: note || null });
+  state.pending = null;
+  render();
+}
+
+function failWith(errorType, detail) {
+  state.pending = { phase: 'error', errorType: errorType, detail: String(detail || '') };
+  state.errorLog = bumpErrorLog(errorType);
+  render();
+}
+
+function runReveal(fullAnswer, note) {
+  state.pending.phase = 'streaming';
+  render();
+  const startedAt = Date.now();
+  (function tick() {
+    if (!state.pending || state.pending.phase !== 'streaming') return;
+    const ratio = Math.min(1, (Date.now() - startedAt) / REVEAL_MS);
+    state.pending.revealed = fullAnswer.slice(0, Math.round(fullAnswer.length * ratio));
+    render();
+    if (ratio >= 1) { finalizeMessage(note); return; }
+    setTimeout(tick, 40);
+  })();
+}
+
+function settleSuccess(answer, folders, note) {
+  const start = state.pending.__start || Date.now();
+  const remaining = Math.max(0, MIN_THINK_MS - (Date.now() - start));
+  setTimeout(function () {
+    if (!state.pending || state.pending.phase === 'interrupted') return;
+    state.pending.phase = 'crossfade';
+    state.pending.fullAnswer = answer;
+    state.pending.folders = folders || [];
+    state.pending.revealed = '';
+    render();
+    setTimeout(function () {
+      if (state.pending && state.pending.phase === 'crossfade') runReveal(answer, note);
+    }, CROSSFADE_MS);
+  }, remaining);
+}
+
+// A normal, organic send: always succeeds (this preview only fails on the
+// explicit demo triggers below, so testing the happy path stays predictable).
+function send() {
+  const content = state.text.trim();
+  if (!content || isGenerating()) return;
+  if (state.pending) state.pending = null; // drop a leftover error/interrupted bubble
+  state.messages.push({ role: 'user', content: content });
+  state.text = '';
+  state.pending = { phase: 'thinking', revealed: '', fullAnswer: null, folders: [], thinkingLabel: 'Thinking', __start: Date.now() };
+  render();
+  const reply = CANNED_REPLIES[state.messages.length % CANNED_REPLIES.length];
+  settleSuccess(reply, [{ n: 1, title: 'Denali trip prep' }]);
+}
+
+// Demo trigger: sends one of the realistic canned prompts, then - instead of
+// succeeding - runs the fixture raw error for that type through the SAME
+// classifyError() the real client uses, and renders the resulting typed state.
+function sendDemo(type) {
+  if (isGenerating()) return;
+  if (state.pending) state.pending = null;
+  const content = DEMO_PROMPTS[type];
+  state.messages.push({ role: 'user', content: content });
+  state.text = '';
+  state.pending = { phase: 'thinking', revealed: '', fullAnswer: null, folders: [], thinkingLabel: 'Thinking', __start: Date.now(), demoType: type };
+  render();
+  const start = Date.now();
+  setTimeout(function () {
+    if (!state.pending || state.pending.phase === 'interrupted') return;
+    const remaining = Math.max(0, MIN_THINK_MS - (Date.now() - start));
+    setTimeout(function () {
+      if (!state.pending || state.pending.phase === 'interrupted') return;
+      const errorType = classifyError(FIXTURE_RAW_ERRORS[type]);
+      failWith(errorType, FIXTURE_RAW_ERRORS[type].message || (type + ' (client-side timeout)'));
+    }, remaining);
+  }, 500);
+}
+
+function stop() {
+  if (!state.pending) return;
+  state.pending.phase = 'interrupted';
+  render();
+}
+
+function regenerate() {
+  state.pending = null;
+  render();
+  send(); // in this preview, Regenerate simply re-issues a normal turn
+}
+
+// The single recovery action per typed error - dispatches by errorType,
+// exactly matching the copy/action pairing in ERROR_TYPES above.
+function onErrorAction() {
+  const p = state.pending;
+  if (!p || p.phase !== 'error') return;
+  const type = p.errorType;
+  const demoType = p.demoType;
+  const label = (ERROR_TYPES[type] || ERROR_TYPES.unknown).thinkingLabel;
+  state.pending = { phase: 'thinking', revealed: '', fullAnswer: null, folders: [], thinkingLabel: label, __start: Date.now() };
+  render();
+  setTimeout(function () {
+    if (!state.pending || state.pending.phase === 'interrupted') return;
+    let note = null;
+    if (type === 'rate_limit') note = 'Answered by the fallback model after a rate limit.';
+    else if (type === 'context_window') note = 'Sent with a shortened prompt (older turns trimmed) after the context limit was hit.';
+    const answer = (demoType && RECOVERY_REPLIES[demoType]) || RECOVERY_REPLIES.network;
+    settleSuccess(answer, [{ n: 1, title: 'Denali trip prep' }], note);
+  }, 700);
+}
+
+render();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="4ec44751-r0-1786463167">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "4ec44751-8770-44e9-9ab1-14233d571e3b", "revision": 0, "deploy_marker": "4ec44751-r0-1786463167", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
