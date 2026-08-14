@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah — Flat message layout (preview)</title>
+<meta name="theme-color" content="#121212">
+<style>
+/* Design tokens copied 1:1 from the live app's WCAG-AA token pass, so this
+   preview matches the real chat surface exactly. No network, no auth, no
+   Supabase - every message below is a static, synthetic fixture. */
+:root{
+  color-scheme:dark;
+  --bg:#121212;
+  --surface:#1c1c1e;
+  --surface-2:#242427;
+  --border:#3a3a3d;
+  --text-primary:#f2f2f3;
+  --text-secondary:#b7bac0;
+  --accent:#3ddb96;
+  --accent-muted-dark:#2f9d6c;
+  --accent-contrast:#06120c;
+  --danger:#ff9086;
+  --warning:#e7b567;
+  --focus-ring:#7db8ff;
+  --msg-row-user-bg:var(--surface-2);
+  --msg-row-assistant-bg:transparent;
+  --flat-gutter:14px;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f6f6f7;
+  --surface:#ffffff;
+  --surface-2:#edeef0;
+  --border:#d6d8db;
+  --text-primary:#17181a;
+  --text-secondary:#53565c;
+  --accent:#0e7a4a;
+  --accent-muted-dark:#0e7a4a;
+  --accent-contrast:#ffffff;
+  --danger:#b3261e;
+  --warning:#8a5a00;
+  --focus-ring:#0b5fb8;
+  --msg-row-user-bg:var(--surface-2);
+  --msg-row-assistant-bg:transparent;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100%;max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+header{padding:12px 14px 6px}
+.header-top{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:18px;margin:0}
+.preview-badge{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--text-secondary);border:1px solid var(--border);border-radius:999px;padding:2px 9px;text-transform:uppercase}
+.menu-btn{width:40px;height:40px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:10px;padding:0;font-size:16px;cursor:pointer}
+.controls{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-bottom:4px}
+.controls .hint{font-size:11px;color:var(--text-secondary)}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px}
+.seg button{background:transparent;color:var(--text-secondary);border:0;border-radius:999px;padding:6px 13px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.seg button.active{background:var(--text-primary);color:var(--bg)}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px}
+#thread.flat{padding:0;gap:0}
+
+/* ---- classic bubble rendering (kept only for the on-page before/after toggle) ---- */
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-contrast);border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-bottom-left-radius:4px}
+.cites{align-self:flex-start;font-size:12px;color:var(--text-secondary);margin-top:-4px;padding:0 6px}
+
+/* ---- new flat, high-contrast message-row layout ---- */
+.turn{display:flex;flex-direction:column}
+.msg-row{width:100%;display:flex;gap:12px;align-items:flex-start;padding:16px var(--flat-gutter)}
+.msg-row.role-user{background:var(--msg-row-user-bg)}
+.msg-row.role-assistant{background:var(--msg-row-assistant-bg)}
+.msg-row-avatar-col{width:28px;flex:none;display:flex;justify-content:center}
+.avatar{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;line-height:1}
+.msg-row.role-user .avatar{background:var(--accent-muted-dark);color:#fff}
+.msg-row.role-assistant .avatar{background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border)}
+.msg-row-content{flex:1;min-width:0;max-width:640px}
+.msg-row-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:6px}
+.msg-row-text{white-space:pre-wrap;word-wrap:break-word;font-size:15px;line-height:1.6;color:var(--text-primary)}
+.msg-row-cites{padding:0 var(--flat-gutter) 12px calc(var(--flat-gutter) + 28px + 12px);font-size:12px;color:var(--text-secondary);margin-top:-10px}
+
+.think-row{display:inline-flex;align-items:center;gap:8px}
+.think-label{font-size:13px;color:var(--text-secondary)}
+.think-dots{display:inline-flex;gap:5px;padding:4px 2px;align-items:center}
+.think-dot{font-size:16px;line-height:1;color:var(--text-secondary);animation:think-bounce 1.1s infinite ease-in-out}
+@keyframes think-bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+.composer{display:flex;gap:8px;padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+textarea{flex:1;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:120px}
+button{background:var(--accent);color:var(--accent-contrast);border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5}
+.muted{color:var(--text-secondary);font-size:14px}
+</style></head><body>
+<div id="root">
+  <header>
+    <div class="header-top">
+      <div style="display:flex;align-items:center;gap:8px">
+        <h1>Alleah</h1>
+        <span class="preview-badge">Preview</span>
+      </div>
+      <button class="menu-btn" type="button" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">☀️</button>
+    </div>
+    <div class="controls">
+      <span class="hint">Message layout</span>
+      <div class="seg" role="group" aria-label="Message layout">
+        <button type="button" id="flatBtn" class="active">Flat (new)</button>
+        <button type="button" id="classicBtn">Classic bubbles</button>
+      </div>
+    </div>
+  </header>
+  <div id="thread" class="flat"></div>
+  <div class="composer">
+    <textarea id="composerInput" placeholder="Message Alleah..." rows="1"></textarea>
+    <button id="sendBtn" disabled>Send</button>
+  </div>
+</div>
+<script>
+// ===== Synthetic, generic demo fixtures - no real user data, no network. =====
+var ROLE_META = {
+  user: {label:'You', avatar:'U'},
+  assistant: {label:'Alleah', avatar:'A'},
+};
+
+var seedMessages = [
+  {role:'user', content:"Hey, can you help me organize my week? I have a project deadline Friday and two client calls."},
+  {role:'assistant', content:"Sure - here's a first pass:\n\n• Mon/Tue: deep-work blocks on the project deliverable\n• Wed: buffer + call prep\n• Thu: client call #1 (morning), client call #2 (afternoon)\n• Fri: final polish + submit before EOD\n\nWant me to pencil in specific times?", folders:[{n:1, title:'Work preferences'}, {n:2, title:'Weekly routines'}]},
+  {role:'user', content:"Also don't forget I'm traveling Wednesday afternoon."},
+  {role:'user', content:"Flight lands at 6pm local, so I'll be offline most of the day."},
+  {role:'assistant', content:"Good catch - updated. I moved call prep to Tuesday evening and blocked Wednesday afternoon as travel/offline."},
+  {role:'assistant', content:"One more thing: your second client call was originally set for Wednesday 4pm, which now conflicts with your flight. I moved it to Thursday 10am - want me to draft the reschedule email?", folders:[{n:2, title:'Weekly routines'}]},
+  {role:'user', content:"Yes please, keep it short and friendly."},
+  {role:'assistant', content:"Draft:\n\n\"Hi - a scheduling conflict came up on my end. Could we shift our Wednesday 4pm call to Thursday at 10am instead? Sorry for the short notice, and thanks for your flexibility!\"\n\nSay the word and I'll consider this logged as your standard reschedule tone for next time.", folders:[{n:1, title:'Work preferences'}]},
+];
+
+var replyBank = [
+  "Got it - I've noted that down. Anything else you'd like me to adjust?",
+  "Makes sense. I'll keep that in mind for future planning.",
+  "Noted. Let me know if priorities shift and I'll re-balance the schedule.",
+  "Sounds good - I've folded that into the plan above.",
+];
+
+var state = {
+  messages: seedMessages.slice(),
+  layout: 'flat', // 'flat' | 'classic'
+  theme: 'dark',
+  pendingText: null, // set while the canned "thinking" animation plays
+};
+
+var threadEl = document.getElementById('thread');
+var composerInput = document.getElementById('composerInput');
+var sendBtn = document.getElementById('sendBtn');
+var flatBtn = document.getElementById('flatBtn');
+var classicBtn = document.getElementById('classicBtn');
+var themeBtn = document.getElementById('themeBtn');
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function groupIntoTurns(messages) {
+  var groups = [];
+  messages.forEach(function(m, i) {
+    var last = groups[groups.length - 1];
+    if (last && last.role === m.role) last.items.push(Object.assign({}, m, {i:i}));
+    else groups.push({role: m.role, items: [Object.assign({}, m, {i:i})]});
+  });
+  return groups;
+}
+
+function citesHtml(m) {
+  if (!m.folders || !m.folders.length) return '';
+  var parts = m.folders.map(function(f){ return '[' + f.n + '] ' + escapeHtml(f.title); }).join('  ');
+  return '<div class="msg-row-cites">memory: ' + parts + '</div>';
+}
+
+function citesHtmlClassic(m) {
+  if (!m.folders || !m.folders.length) return '';
+  var parts = m.folders.map(function(f){ return '[' + f.n + '] ' + escapeHtml(f.title); }).join('  ');
+  return '<div class="cites">memory: ' + parts + '</div>';
+}
+
+function renderFlat() {
+  var groups = groupIntoTurns(state.messages);
+  var html = groups.map(function(g) {
+    var meta = ROLE_META[g.role] || {label:g.role, avatar:'?'};
+    return '<div class="turn">' + g.items.map(function(m, idx) {
+      var row = '<div class="msg-row role-' + g.role + '">' +
+        '<div class="msg-row-avatar-col">' + (idx === 0 ? '<div class="avatar" aria-hidden="true">' + meta.avatar + '</div>' : '') + '</div>' +
+        '<div class="msg-row-content">' +
+          (idx === 0 ? '<div class="msg-row-label">' + meta.label + '</div>' : '') +
+          '<div class="msg-row-text">' + escapeHtml(m.content) + '</div>' +
+        '</div></div>';
+      return row + citesHtml(m);
+    }).join('') + '</div>';
+  }).join('');
+  if (state.pendingText !== null) html += pendingHtml(true);
+  if (!state.messages.length && state.pendingText === null) {
+    html = '<p class="muted" style="padding:12px 20px">Talk to me. What you tell me about what you know gets remembered - automatically.</p>';
+  }
+  threadEl.innerHTML = html;
+}
+
+function renderClassic() {
+  var html = state.messages.map(function(m) {
+    return '<div class="msg ' + m.role + '">' + escapeHtml(m.content) + '</div>' + citesHtmlClassic(m);
+  }).join('');
+  if (state.pendingText !== null) html += pendingHtml(false);
+  if (!state.messages.length && state.pendingText === null) {
+    html = '<p class="muted" style="padding:0 6px">Talk to me. What you tell me about what you know gets remembered - automatically.</p>';
+  }
+  threadEl.innerHTML = html;
+}
+
+function thinkingDotsHtml() {
+  return '<div class="think-row" role="status" aria-live="polite" aria-label="Alleah is thinking">' +
+    '<span class="think-label">Thinking</span>' +
+    '<span class="think-dots">' +
+      '<span class="think-dot" style="animation-delay:0s">\u2022</span>' +
+      '<span class="think-dot" style="animation-delay:.15s">\u2022</span>' +
+      '<span class="think-dot" style="animation-delay:.3s">\u2022</span>' +
+    '</span></div>';
+}
+
+function pendingHtml(flat) {
+  if (!flat) {
+    return '<div class="msg assistant pending">' + thinkingDotsHtml() + '</div>';
+  }
+  return '<div class="msg-row role-assistant pending">' +
+    '<div class="msg-row-avatar-col"><div class="avatar" aria-hidden="true">A</div></div>' +
+    '<div class="msg-row-content"><div class="msg-row-label">Alleah</div><div class="msg-row-text">' + thinkingDotsHtml() + '</div></div></div>';
+}
+
+function render() {
+  threadEl.className = state.layout === 'flat' ? 'flat' : '';
+  if (state.layout === 'flat') renderFlat(); else renderClassic();
+  threadEl.scrollTop = threadEl.scrollHeight;
+}
+
+function setLayout(layout) {
+  state.layout = layout;
+  flatBtn.classList.toggle('active', layout === 'flat');
+  classicBtn.classList.toggle('active', layout === 'classic');
+  render();
+}
+
+flatBtn.addEventListener('click', function(){ setLayout('flat'); });
+classicBtn.addEventListener('click', function(){ setLayout('classic'); });
+
+themeBtn.addEventListener('click', function(){
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', state.theme);
+  themeBtn.textContent = state.theme === 'light' ? '🌙' : '☀️';
+});
+
+composerInput.addEventListener('input', function(){
+  sendBtn.disabled = !composerInput.value.trim();
+});
+composerInput.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+sendBtn.addEventListener('click', send);
+
+function send() {
+  var content = composerInput.value.trim();
+  if (!content) return;
+  composerInput.value = '';
+  sendBtn.disabled = true;
+  state.messages.push({role:'user', content: content});
+  render();
+  state.pendingText = '';
+  render();
+  setTimeout(function() {
+    var reply = replyBank[Math.floor(Math.random() * replyBank.length)];
+    state.pendingText = null;
+    state.messages.push({role:'assistant', content: reply});
+    render();
+  }, 700);
+}
+
+render();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="d8d33be4-r0-1786686558">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "d8d33be4-f756-459a-801f-4ab53157053b", "revision": 0, "deploy_marker": "d8d33be4-r0-1786686558", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
