@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Alleah — Composer preview</title>
+<meta name="theme-color" content="#121212">
+<style>
+/* ===== Design tokens (matched to live app) ===== */
+:root{
+  color-scheme:dark;
+  --bg:#121212;
+  --surface:#1c1c1e;
+  --surface-2:#242427;
+  --border:#3a3a3d;
+  --text-primary:#f2f2f3;
+  --text-secondary:#b7bac0;
+  --accent:#3ddb96;
+  --accent-muted-dark:#2f9d6c;
+  --accent-contrast:#06120c;
+  --danger:#ff9086;
+  --danger-contrast:#2b0705;
+  --warning:#e7b567;
+  --info:#7db8ff;
+  --purple:#dd9dff;
+  --neutral:#9498a1;
+  --focus-ring:#7db8ff;
+  --vvh: 100dvh;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f6f6f7;
+  --surface:#ffffff;
+  --surface-2:#edeef0;
+  --border:#d6d8db;
+  --text-primary:#17181a;
+  --text-secondary:#53565c;
+  --accent:#0e7a4a;
+  --accent-muted-dark:#0e7a4a;
+  --accent-contrast:#ffffff;
+  --danger:#b3261e;
+  --danger-contrast:#ffffff;
+  --warning:#8a5a00;
+  --info:#0b5fb8;
+  --purple:#7c3aad;
+  --neutral:#5b5e65;
+  --focus-ring:#0b5fb8;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100dvh;height:var(--vvh,100dvh);max-width:680px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:8px;flex:none}
+h1{font-size:18px;margin:0}
+.header-actions{display:flex;gap:8px;align-items:center}
+.icon-btn{width:44px;height:44px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:12px;padding:0;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.icon-btn:active{background:var(--surface-2)}
+.icon-btn[aria-expanded="true"]{background:var(--surface-2);border-color:var(--accent)}
+#chatView{flex:1;min-height:0;display:flex;flex-direction:column}
+.thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-contrast);border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-row{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:14px}
+.msg-row.user{align-self:flex-end;align-items:flex-end}
+.msg-row.assistant{align-self:flex-start;align-items:flex-start}
+.msg-row-meta{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--text-secondary);padding:0 2px}
+.msg-row-name{font-weight:700;color:var(--text-primary)}
+.msg-row-time{color:var(--text-secondary)}
+.typing{align-self:flex-start;color:var(--text-secondary);font-size:14px;padding:0 6px}
+.jump-latest-btn{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:999px;padding:8px 16px;min-height:40px;font:inherit;font-size:13px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer;z-index:5}
+.jump-latest-btn .badge-count{background:var(--accent);color:var(--accent-contrast);border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px}
+.composer{display:flex;gap:8px;align-items:flex-end;padding:10px 14px calc(14px + env(safe-area-inset-bottom));flex:none;position:relative}
+.attach-btn{width:44px;height:44px;min-width:44px;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:0;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.attach-btn:active{background:var(--surface)}
+textarea{flex:1;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:12px 14px;font:inherit;resize:none;min-height:44px;max-height:min(40dvh,320px);overflow-y:auto;line-height:1.4}
+button{background:var(--accent);color:var(--accent-contrast);border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer;min-height:44px}
+button.secondary{background:var(--surface-2);color:var(--text-primary);font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);min-height:40px}
+button.stop-btn{background:var(--danger);color:var(--danger-contrast)}
+button:disabled{opacity:.5}
+.composer button.send-btn,.composer button.stop-btn{min-width:64px;min-height:44px;flex:none}
+.attach-note{position:absolute;left:14px;right:14px;bottom:100%;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary);font-size:12.5px;padding:8px 12px;border-radius:10px;text-align:center}
+.muted{color:var(--text-secondary);font-size:14px}
+.stub-view{flex:1;overflow-y:auto;padding:24px 18px;color:var(--text-secondary);font-size:14px}
+.stub-view h2{color:var(--text-primary);font-size:16px;margin:0 0 8px}
+.menu-wrap{position:relative}
+.menu-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:208px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:30}
+.menu-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);padding:10px 12px 6px}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;background:transparent;color:var(--text-primary);border:0;border-radius:10px;padding:12px 12px;font:inherit;font-size:15px;text-align:left;cursor:pointer}
+.menu-item:active{background:var(--surface-2)}
+.menu-item.active{background:var(--accent);color:var(--accent-contrast);font-weight:700}
+.menu-sep{height:1px;background:var(--border);margin:6px 6px}
+/* ===== History bottom sheet (narrow) / dropdown panel (>=700px) ===== */
+.history-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;animation:backdrop-in .18s ease}
+@keyframes backdrop-in{from{opacity:0}to{opacity:1}}
+.history-sheet{position:fixed;left:0;right:0;bottom:0;max-height:75dvh;background:var(--surface);border-top-left-radius:20px;border-top-right-radius:20px;box-shadow:0 -12px 40px rgba(0,0,0,.5);z-index:41;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);animation:sheet-up .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--border);margin:10px auto 2px;flex:none}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 6px;flex:none}
+.sheet-head h2{font-size:16px;margin:0}
+.sheet-body{overflow-y:auto;padding:4px 10px 14px}
+.conv-row{display:flex;align-items:center}
+.conv-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-radius:12px;padding:10px 10px;min-height:60px;color:var(--text-primary);font:inherit;cursor:pointer}
+.conv-item:active{background:var(--surface-2)}
+.conv-item .conv-main{flex:1;min-width:0}
+.conv-item .conv-title{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-item .conv-snippet{font-size:12.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv-item .conv-time{font-size:11.5px;color:var(--text-secondary);flex:none}
+.conv-del{width:44px;height:44px;flex:none;background:transparent;border:0;color:var(--text-secondary);font-size:16px;border-radius:10px;cursor:pointer;min-height:44px}
+.conv-del:active{background:var(--surface-2);color:var(--danger)}
+.sheet-empty{padding:24px 14px;color:var(--text-secondary);font-size:13.5px;text-align:center}
+@media (min-width:700px){
+  .history-sheet{left:auto;right:14px;bottom:auto;top:62px;width:340px;max-height:min(70dvh,520px);border-radius:16px;animation:panel-in .16s ease}
+  .sheet-handle{display:none}
+  .history-backdrop{background:rgba(0,0,0,.25)}
+}
+@keyframes panel-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+</style></head><body>
+<div id="root">
+  <header>
+    <h1>Alleah</h1>
+    <div class="header-actions">
+      <button id="historyBtn" class="icon-btn" aria-label="Conversation history">🕘</button>
+      <div class="menu-wrap" id="menuWrap">
+        <button id="menuBtn" class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Open menu">☰</button>
+        <div id="menuDropdown" class="menu-dropdown" role="menu" hidden></div>
+      </div>
+    </div>
+  </header>
+  <div id="chatView">
+    <div class="thread-wrap">
+      <div id="thread"></div>
+      <button id="jumpBtn" type="button" class="jump-latest-btn" hidden>↓ Jump to latest <span class="badge-count" id="jumpCount" hidden></span></button>
+    </div>
+    <div class="composer">
+      <div id="attachNote" class="attach-note" hidden></div>
+      <button id="attachBtn" type="button" class="attach-btn" aria-label="Attach file">📎</button>
+      <textarea id="composerInput" placeholder="Message Alleah..." rows="1"></textarea>
+      <button id="sendBtn" type="button" class="send-btn" disabled>Send</button>
+    </div>
+  </div>
+  <div id="stubView" class="stub-view" hidden></div>
+</div>
+<div id="historyRoot"></div>
+<script>
+/* ============================================================
+   SYNTHETIC DEMO FIXTURES ONLY — no network calls, no backend,
+   no auth. Everything below is generic placeholder content.
+   ============================================================ */
+(function(){
+"use strict";
+
+var MIN = 60000, HOUR = 3600000, DAY = 86400000;
+var now = Date.now();
+
+var INITIAL_MESSAGES = [
+  {role:'user', content:'Can you help me put together a training plan for a half marathon in 10 weeks?', ts: now - 42*MIN},
+  {role:'assistant', content:"Sure — 10 weeks is enough to build up safely if you're already running a bit. I'd structure it as 3 easy runs + 1 long run per week, adding about 10% distance weekly, with a taper in the last 2 weeks.", ts: now - 41*MIN},
+  {role:'user', content:'I can currently run about 5k comfortably, 3x a week.', ts: now - 39*MIN},
+  {role:'assistant', content:"Good base. Week 1 long run at 6-7k, easy runs at 4-5k. We'll ramp the long run toward 16-17k by week 8, then taper. Want me to lay out all 10 weeks day-by-day?", ts: now - 38*MIN},
+  {role:'user', content:'Yes please, and keep rest days flexible around my work schedule.', ts: now - 20*MIN},
+  {role:'assistant', content:"Noted — I'll mark rest days as \"flexible\" rather than fixed weekdays so you can shift them around meetings. Drafting the full 10-week table now.", ts: now - 19*MIN},
+];
+
+var PAST_CONVERSATIONS = [
+  {id:'c1', title:'Weeknight dinner ideas', snippet:"Here's a rotating 5-night list that reuses prep across meals...", ts: now - 2*DAY,
+   messages:[
+     {role:'user', content:'I need quick weeknight dinner ideas, nothing too fancy.', ts: now - 2*DAY},
+     {role:'assistant', content:"Here's a rotating 5-night list that reuses prep across meals so you're not chopping from scratch every night.", ts: now - 2*DAY + 2*MIN}
+   ]},
+  {id:'c2', title:'Budget for apartment move', snippet:'Rough moving budget: deposit, movers, first month utilities...', ts: now - 6*DAY,
+   messages:[
+     {role:'user', content:'What should I budget for moving into a new apartment next month?', ts: now - 6*DAY},
+     {role:'assistant', content:'Rough moving budget: deposit, movers, first month utilities, and a small buffer for stuff you forgot you needed.', ts: now - 6*DAY + 3*MIN}
+   ]},
+  {id:'c3', title:'Sci-fi book recommendations', snippet:'If you liked slow-burn world-building, try starting with...', ts: now - 9*DAY,
+   messages:[
+     {role:'user', content:'Recommend some sci-fi books, I like slow-burn world-building.', ts: now - 9*DAY},
+     {role:'assistant', content:'If you liked slow-burn world-building, try starting with a first-contact story that spends real time on culture before conflict.', ts: now - 9*DAY + 1*MIN}
+   ]},
+  {id:'c4', title:'Standup notes template', snippet:'A simple 3-line format keeps updates scannable: done, doing, blocked.', ts: now - 15*DAY,
+   messages:[
+     {role:'user', content:'Give me a template for daily standup notes.', ts: now - 15*DAY},
+     {role:'assistant', content:'A simple 3-line format keeps updates scannable: done, doing, blocked — one line each.', ts: now - 15*DAY + 4*MIN}
+   ]},
+];
+
+var DEMO_REPLIES = [
+  "Got it — noted for the plan. Anything else you want folded in before I finalize it?",
+  "Makes sense. I'll factor that in and keep the rest of the structure the same.",
+  "Good call — that's a reasonable constraint, I'll adjust around it.",
+  "Understood. That shouldn't change the overall approach much, just the pacing."
+];
+
+var VIEWS = [
+  {key:'chat', label:'Chat'},
+  {key:'tasks', label:'Tasks'},
+  {key:'goals', label:'Goals'},
+  {key:'upgrades', label:'Upgrades'}
+];
+
+// ---- state ----
+var state = {
+  messages: INITIAL_MESSAGES.slice(),
+  conversations: PAST_CONVERSATIONS.slice(),
+  pending: false,
+  view: 'chat',
+  menuOpen: false,
+  historyOpen: false,
+  autoScroll: true,
+  newCount: 0,
+  theme: document.documentElement.getAttribute('data-theme') || 'dark'
+};
+var prevLen = state.messages.length;
+
+// ---- element refs ----
+var el = {
+  header: document.querySelector('header'),
+  historyBtn: document.getElementById('historyBtn'),
+  menuWrap: document.getElementById('menuWrap'),
+  menuBtn: document.getElementById('menuBtn'),
+  menuDropdown: document.getElementById('menuDropdown'),
+  chatView: document.getElementById('chatView'),
+  thread: document.getElementById('thread'),
+  jumpBtn: document.getElementById('jumpBtn'),
+  jumpCount: document.getElementById('jumpCount'),
+  composerInput: document.getElementById('composerInput'),
+  sendBtn: document.getElementById('sendBtn'),
+  attachBtn: document.getElementById('attachBtn'),
+  attachNote: document.getElementById('attachNote'),
+  stubView: document.getElementById('stubView'),
+  historyRoot: document.getElementById('historyRoot')
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function formatMsgTime(ts) {
+  try { return new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch (e) { return ''; }
+}
+function fmtRelTime(ts) {
+  var diff = Date.now() - ts;
+  if (diff < HOUR) return Math.max(1, Math.round(diff / MIN)) + 'm ago';
+  if (diff < DAY) return Math.round(diff / HOUR) + 'h ago';
+  return Math.round(diff / DAY) + 'd ago';
+}
+
+// ===== Keyboard-safe viewport height: keeps the composer pinned above the
+// on-screen keyboard by tracking the visualViewport (falls back to 100dvh
+// in the CSS for browsers where visualViewport isn't available). =====
+function updateViewportVar() {
+  var h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  document.documentElement.style.setProperty('--vvh', h + 'px');
+}
+updateViewportVar();
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', updateViewportVar);
+  window.visualViewport.addEventListener('scroll', updateViewportVar);
+}
+window.addEventListener('orientationchange', updateViewportVar);
+
+// ===== Auto-growing textarea, visually capped by CSS max-height (dvh-based) =====
+function autoResizeTextarea() {
+  el.composerInput.style.height = 'auto';
+  el.composerInput.style.height = el.composerInput.scrollHeight + 'px';
+}
+
+// ===== Thread rendering =====
+function renderThread() {
+  var parts = [];
+  if (state.messages.length === 0) {
+    parts.push('<p class="muted" style="padding:0 6px">Talk to me. What you tell me gets remembered.</p>');
+  }
+  state.messages.forEach(function(m) {
+    parts.push(
+      '<div class="msg-row ' + m.role + '">' +
+        '<div class="msg-row-meta"><span class="msg-row-name">' + (m.role === 'user' ? 'You' : 'Alleah') + '</span>' +
+        (m.ts ? '<span class="msg-row-time">' + formatMsgTime(m.ts) + '</span>' : '') + '</div>' +
+        '<div class="msg ' + m.role + '">' + escapeHtml(m.content) + '</div>' +
+      '</div>'
+    );
+  });
+  if (state.pending) {
+    parts.push(
+      '<div class="msg-row assistant"><div class="msg-row-meta"><span class="msg-row-name">Alleah</span></div>' +
+      '<div class="typing" role="status" aria-live="polite" aria-label="Alleah is thinking">Alleah is thinking…</div></div>'
+    );
+  }
+  el.thread.innerHTML = parts.join('');
+
+  if (state.autoScroll) {
+    el.thread.scrollTop = el.thread.scrollHeight;
+    if (state.messages.length !== prevLen) state.newCount = 0;
+  } else if (state.messages.length > prevLen) {
+    state.newCount += (state.messages.length - prevLen);
+  }
+  prevLen = state.messages.length;
+  renderJumpButton();
+}
+
+function renderJumpButton() {
+  if (state.autoScroll) {
+    el.jumpBtn.hidden = true;
+  } else {
+    el.jumpBtn.hidden = false;
+    if (state.newCount > 0) {
+      el.jumpCount.hidden = false;
+      el.jumpCount.textContent = String(state.newCount);
+    } else {
+      el.jumpCount.hidden = true;
+    }
+  }
+}
+
+el.thread.addEventListener('scroll', function() {
+  var distanceFromBottom = el.thread.scrollHeight - el.thread.scrollTop - el.thread.clientHeight;
+  var nearBottom = distanceFromBottom < 96;
+  state.autoScroll = nearBottom;
+  if (nearBottom) state.newCount = 0;
+  renderJumpButton();
+});
+
+el.jumpBtn.addEventListener('click', function() {
+  state.autoScroll = true;
+  state.newCount = 0;
+  el.thread.scrollTop = el.thread.scrollHeight;
+  renderJumpButton();
+});
+
+// ===== Composer =====
+el.composerInput.addEventListener('input', function() {
+  autoResizeTextarea();
+  el.sendBtn.disabled = !el.composerInput.value.trim() || state.pending;
+});
+el.composerInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+function setGenerating(on) {
+  state.pending = on;
+  if (on) {
+    el.sendBtn.textContent = 'Stop';
+    el.sendBtn.classList.add('stop-btn');
+    el.sendBtn.disabled = false;
+  } else {
+    el.sendBtn.textContent = 'Send';
+    el.sendBtn.classList.remove('stop-btn');
+    el.sendBtn.disabled = !el.composerInput.value.trim();
+  }
+}
+
+el.sendBtn.addEventListener('click', function() {
+  if (state.pending) { stop(); } else { send(); }
+});
+
+function send() {
+  var content = el.composerInput.value.trim();
+  if (!content || state.pending) return;
+  el.composerInput.value = '';
+  autoResizeTextarea();
+  state.autoScroll = true;
+  state.messages.push({role:'user', content: content, ts: Date.now()});
+  renderThread();
+  setGenerating(true);
+  renderThread();
+  var reply = DEMO_REPLIES[Math.floor(Math.random() * DEMO_REPLIES.length)];
+  window.setTimeout(function() {
+    if (!state.pending) return; // stopped
+    setGenerating(false);
+    state.messages.push({role:'assistant', content: reply, ts: Date.now()});
+    renderThread();
+  }, 900);
+}
+function stop() {
+  setGenerating(false);
+  renderThread();
+}
+
+el.attachBtn.addEventListener('click', function() {
+  el.attachNote.hidden = false;
+  el.attachNote.textContent = 'Attachments aren\u2019t wired up in this preview.';
+  window.setTimeout(function() { el.attachNote.hidden = true; }, 2200);
+});
+
+// ===== Header menu =====
+function renderMenu() {
+  var items = VIEWS.map(function(v) {
+    return '<button type="button" role="menuitem" class="menu-item' + (state.view === v.key ? ' active' : '') + '" data-view="' + v.key + '">' + v.label + '</button>';
+  }).join('');
+  el.menuDropdown.innerHTML =
+    '<div class="menu-label">View</div>' + items +
+    '<div class="menu-sep"></div>' +
+    '<button type="button" role="menuitem" class="menu-item" id="themeToggleItem">' + (state.theme === 'light' ? '🌙 Dark theme' : '☀️ Light theme') + '</button>' +
+    '<button type="button" role="menuitem" class="menu-item" id="newChatItem">+ New chat</button>';
+
+  Array.prototype.forEach.call(el.menuDropdown.querySelectorAll('[data-view]'), function(btn) {
+    btn.addEventListener('click', function() {
+      setView(btn.getAttribute('data-view'));
+      closeMenu();
+    });
+  });
+  document.getElementById('themeToggleItem').addEventListener('click', toggleTheme);
+  document.getElementById('newChatItem').addEventListener('click', function() { closeMenu(); newChat(); });
+}
+function openMenu() {
+  state.menuOpen = true;
+  el.menuDropdown.hidden = false;
+  el.menuBtn.setAttribute('aria-expanded', 'true');
+  el.menuBtn.setAttribute('aria-label', 'Close menu');
+}
+function closeMenu() {
+  state.menuOpen = false;
+  el.menuDropdown.hidden = true;
+  el.menuBtn.setAttribute('aria-expanded', 'false');
+  el.menuBtn.setAttribute('aria-label', 'Open menu');
+}
+el.menuBtn.addEventListener('click', function() {
+  if (state.menuOpen) closeMenu(); else { renderMenu(); openMenu(); }
+});
+document.addEventListener('mousedown', function(e) {
+  if (state.menuOpen && !el.menuWrap.contains(e.target)) closeMenu();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && state.menuOpen) closeMenu();
+});
+
+function toggleTheme() {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', state.theme);
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', state.theme === 'light' ? '#f6f6f7' : '#121212');
+  renderMenu();
+}
+
+// ===== View switching (Chat vs. stub views for Tasks/Goals/Upgrades) =====
+var STUB_LABELS = {tasks:'Tasks', goals:'Goals', upgrades:'Upgrades'};
+function setView(v) {
+  state.view = v;
+  if (v === 'chat') {
+    el.chatView.hidden = false;
+    el.stubView.hidden = true;
+  } else {
+    el.chatView.hidden = true;
+    el.stubView.hidden = false;
+    el.stubView.innerHTML =
+      '<h2>' + STUB_LABELS[v] + '</h2>' +
+      '<p>This preview focuses on the chat composer, scroll and history-access fix. The ' + STUB_LABELS[v] + ' tab is unchanged and not part of this feature.</p>' +
+      '<button type="button" class="secondary" id="backToChatBtn">\u2190 Back to chat</button>';
+    document.getElementById('backToChatBtn').addEventListener('click', function() { setView('chat'); });
+  }
+}
+
+// ===== New chat / archive-to-history =====
+function archiveCurrentIfAny() {
+  if (!state.messages.length) return null;
+  var firstUser = state.messages.filter(function(m){ return m.role === 'user'; })[0];
+  var assistants = state.messages.filter(function(m){ return m.role === 'assistant'; });
+  var lastAssistant = assistants.length ? assistants[assistants.length - 1] : null;
+  return {
+    id: 'c' + Date.now().toString(36),
+    title: firstUser ? firstUser.content.slice(0, 48) : 'Conversation',
+    snippet: lastAssistant ? lastAssistant.content.slice(0, 80) : '',
+    ts: Date.now(),
+    messages: state.messages.slice()
+  };
+}
+function newChat() {
+  var archived = archiveCurrentIfAny();
+  if (archived) state.conversations.unshift(archived);
+  state.messages = [];
+  state.pending = false;
+  state.autoScroll = true;
+  state.newCount = 0;
+  setGenerating(false);
+  el.composerInput.value = '';
+  autoResizeTextarea();
+  renderThread();
+}
+
+// ===== History bottom sheet / dropdown panel =====
+function renderHistorySheet() {
+  if (!state.historyOpen) { el.historyRoot.innerHTML = ''; return; }
+  var body;
+  if (!state.conversations.length) {
+    body = '<p class="sheet-empty">Past conversations you archive with "New chat" will show up here.</p>';
+  } else {
+    body = state.conversations.map(function(c) {
+      return '<div class="conv-row">' +
+        '<button type="button" class="conv-item" data-open="' + c.id + '">' +
+          '<span class="conv-main">' +
+            '<div class="conv-title">' + escapeHtml(c.title) + '</div>' +
+            '<div class="conv-snippet">' + escapeHtml(c.snippet) + '</div>' +
+          '</span>' +
+          '<span class="conv-time">' + fmtRelTime(c.ts) + '</span>' +
+        '</button>' +
+        '<button type="button" class="conv-del" data-del="' + c.id + '" aria-label="Delete conversation">\uD83D\uDDD1</button>' +
+      '</div>';
+    }).join('');
+  }
+  el.historyRoot.innerHTML =
+    '<div class="history-backdrop" id="historyBackdrop"></div>' +
+    '<div class="history-sheet" role="dialog" aria-modal="true" aria-label="Conversation history">' +
+      '<div class="sheet-handle"></div>' +
+      '<div class="sheet-head"><h2>History</h2>' +
+        '<button type="button" class="icon-btn" id="historyCloseBtn" style="width:40px;height:40px" aria-label="Close history">\u2715</button></div>' +
+      '<div class="sheet-body">' + body + '</div>' +
+    '</div>';
+  document.getElementById('historyBackdrop').addEventListener('click', closeHistory);
+  document.getElementById('historyCloseBtn').addEventListener('click', closeHistory);
+  Array.prototype.forEach.call(el.historyRoot.querySelectorAll('[data-open]'), function(btn) {
+    btn.addEventListener('click', function() { openConversation(btn.getAttribute('data-open')); });
+  });
+  Array.prototype.forEach.call(el.historyRoot.querySelectorAll('[data-del]'), function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      state.conversations = state.conversations.filter(function(c){ return c.id !== btn.getAttribute('data-del'); });
+      renderHistorySheet();
+    });
+  });
+}
+function openHistory() { state.historyOpen = true; renderHistorySheet(); }
+function closeHistory() { state.historyOpen = false; renderHistorySheet(); }
+el.historyBtn.addEventListener('click', openHistory);
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && state.historyOpen) closeHistory();
+});
+
+function openConversation(id) {
+  var chosen = state.conversations.filter(function(c){ return c.id === id; })[0];
+  if (!chosen) return;
+  var archived = archiveCurrentIfAny();
+  state.conversations = state.conversations.filter(function(c){ return c.id !== id; });
+  if (archived) state.conversations.unshift(archived);
+  state.messages = chosen.messages.slice();
+  state.pending = false;
+  state.autoScroll = true;
+  state.newCount = 0;
+  setGenerating(false);
+  closeHistory();
+  renderThread();
+}
+
+// ---- boot ----
+setGenerating(false);
+renderThread();
+autoResizeTextarea();
+})();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="302e9d6e-r0-1786778660">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "302e9d6e-7e4d-4522-9a7b-c04864786674", "revision": 0, "deploy_marker": "302e9d6e-r0-1786778660", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
