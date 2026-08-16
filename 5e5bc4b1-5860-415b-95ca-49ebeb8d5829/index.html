@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Alleah — Message actions preview</title>
+<meta name="theme-color" content="#121212">
+<style>
+/* ===== Design tokens (lifted from the live app's dark theme) ===== */
+:root{
+  color-scheme:dark;
+  --bg:#121212;
+  --surface:#1c1c1e;
+  --surface-2:#242427;
+  --border:#3a3a3d;
+  --text-primary:#f2f2f3;
+  --text-secondary:#b7bac0;
+  --accent:#3ddb96;
+  --accent-contrast:#06120c;
+  --danger:#ff9086;
+  --danger-contrast:#2b0705;
+  --warning:#e7b567;
+  --focus-ring:#7db8ff;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100dvh;max-width:680px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:8px;flex:none}
+h1{font-size:18px;margin:0}
+.preview-flag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);border:1px solid var(--border);border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:middle}
+.header-actions{display:flex;gap:8px;align-items:center;position:relative}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px;min-height:0;-webkit-overflow-scrolling:touch}
+.thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-contrast);border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-bottom-left-radius:4px}
+.cites{align-self:flex-start;font-size:12px;color:var(--text-secondary);margin-top:-4px;padding:0 6px}
+.msg-row{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:14px}
+.msg-row.user{align-self:flex-end;align-items:flex-end}
+.msg-row.assistant{align-self:flex-start;align-items:flex-start}
+.msg-row-meta{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--text-secondary);padding:0 2px}
+.msg-row-name{font-weight:700;color:var(--text-primary)}
+.msg-row-time{color:var(--text-secondary)}
+.composer{display:flex;gap:8px;align-items:flex-end;padding:10px 14px calc(14px + env(safe-area-inset-bottom));position:relative;flex:none}
+.composer button{min-height:44px;min-width:44px}
+.attach-btn{width:44px;height:44px;min-width:44px;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:0;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.attach-note{position:absolute;left:14px;right:14px;bottom:100%;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary);font-size:12.5px;padding:8px 12px;border-radius:10px;text-align:center}
+textarea{flex:1;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:min(40dvh,320px);overflow-y:auto;line-height:1.4}
+button{background:var(--accent);color:var(--accent-contrast);border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:var(--surface-2);color:var(--text-primary);font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--border)}
+button.stop-btn{background:var(--danger);color:var(--danger-contrast)}
+button:disabled{opacity:.5}
+.muted{color:var(--text-secondary);font-size:14px}
+.upgrade-actions{display:flex;gap:8px;margin-top:10px}
+.upgrade-actions button{flex:1;padding:8px 0}
+.msg.pending{display:flex;flex-direction:column;gap:4px}
+.stream-wrap{display:grid}
+.stream-wrap>*{grid-area:1/1}
+.think-row{display:inline-flex;align-items:center;gap:8px;transition:opacity .25s ease}
+.think-row.fade-out{opacity:0}
+.think-label{font-size:13px;color:var(--text-secondary)}
+.think-dots{display:inline-flex;gap:5px;padding:4px 2px;align-items:center}
+.think-dot{font-size:16px;line-height:1;color:var(--text-secondary);animation:think-bounce 1.1s infinite ease-in-out}
+@keyframes think-bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+.stream-text{opacity:0;transition:opacity .25s ease;white-space:pre-wrap;word-wrap:break-word}
+.stream-text.show{opacity:1}
+.stream-cursor{display:inline-block;width:2px;height:1em;background:var(--text-secondary);vertical-align:text-bottom;margin-left:1px;animation:cursor-blink 1s step-start infinite}
+@keyframes cursor-blink{50%{opacity:0}}
+.interrupted-note{font-size:12px;color:var(--warning);font-style:italic;margin-top:2px}
+.menu-btn{width:44px;height:44px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:12px;padding:0;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu-btn:active{background:var(--surface-2)}
+.menu-btn[aria-expanded="true"]{background:var(--surface-2);border-color:var(--accent)}
+.menu-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:230px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:30;font-size:13px;color:var(--text-secondary)}
+.menu-dropdown p{margin:8px 10px}
+.menu-item{display:block;width:100%;min-height:40px;background:transparent;color:var(--text-primary);border:0;border-radius:10px;padding:8px 12px;font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.menu-item.active{background:var(--accent);color:var(--accent-contrast);font-weight:700}
+.menu-item:disabled{opacity:.4;cursor:default}
+/* ===== Per-message action toolbar (copy / edit / regenerate / stop) =====
+   Always rendered (not hover-only) so keyboard-only and screen-reader
+   users reach every action without a mouse hover state first.
+   Tab-order contract: composer inputs = tabIndex 1-3; each message's
+   variant-nav + action row claims the next ascending block of 6, in
+   on-screen order; header buttons keep default tabIndex, so the browser's
+   sequential-focus-navigation order (explicit ascending tabindex first,
+   then default-order elements) is: composer -> message actions -> header. */
+.msg-actions{display:flex;align-items:center;gap:4px;margin-top:2px;flex-wrap:wrap}
+.msg-action-btn{width:32px;height:32px;min-width:32px;padding:0;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.msg-action-btn:hover:not(:disabled){background:var(--surface-2);color:var(--text-primary)}
+.msg-action-btn:disabled{opacity:.35;cursor:default}
+.msg-action-status{font-size:11.5px;color:var(--accent);font-weight:600;white-space:nowrap;flex:none}
+.variant-nav{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);margin-top:4px}
+.variant-nav-btn{width:26px;height:26px;min-width:26px;padding:0;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:7px;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.variant-nav-btn:disabled{opacity:.3;cursor:default}
+.variant-nav-label{font-size:11.5px}
+.msg-edit-wrap{display:flex;flex-direction:column;gap:8px;width:100%}
+.msg-edit-textarea{width:100%;background:var(--bg);color:var(--text-primary);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;resize:vertical;min-height:70px}
+.msg-edit-actions{display:flex;gap:8px;justify-content:flex-end}
+.banner{margin:10px 14px 0;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--text-secondary);font-size:12.5px}
+</style></head><body>
+<div id="root"></div>
+<script>
+"use strict";
+/* ===================================================================
+   Static preview of "per-message action toolbar" for assistant replies.
+   Everything below is self-contained: no network calls, no auth, no
+   backend - all data is inline synthetic fixture data. The regenerate /
+   copy / edit / stop behavior is simulated locally so the interaction
+   and keyboard/focus story can be reviewed without a live backend.
+=================================================================== */
+
+// ---------- tiny DOM-builder helper (no framework) ----------
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(k => {
+      const v = attrs[k];
+      if (v == null) return;
+      if (k === 'class') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'tabIndex') node.tabIndex = v;
+      else if (k === 'disabled') node.disabled = !!v;
+      else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'focusKey') node.dataset.focusKey = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  children.flat().forEach(c => {
+    if (c == null) return;
+    node.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+  });
+  return node;
+}
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+// ---------- synthetic fixture data (generic, non-real) ----------
+let messages = [
+  {role:'user', content:'Can you summarize what I told you about the Q3 roadmap?', ts: Date.now() - 1000*60*24},
+  {
+    role:'assistant',
+    content:'From your notes: Q3 has three workstreams - onboarding revamp (owner: Priya), the billing migration (owner: Sam), and a research spike on offline sync. Onboarding is targeted for mid-quarter, billing migration is the riskiest item since it touches the payments vendor contract, and the offline-sync spike is explicitly exploratory with no ship commitment yet.',
+    ts: Date.now() - 1000*60*23,
+    folders: [{n:1, title:'Q3 Roadmap Notes'}],
+  },
+  {role:'user', content:'Good. Can you suggest three risks I might be missing?', ts: Date.now() - 1000*60*10},
+  {
+    role:'assistant',
+    content:'Three worth watching: 1) the billing migration and onboarding revamp share one backend engineer, so a slip on either compresses the other. 2) the payments vendor contract renewal date isn\u2019t in your notes - worth confirming it doesn\u2019t land mid-migration. 3) the offline-sync spike has no explicit timebox, so it can quietly absorb spare capacity that onboarding might need later in the quarter.',
+    ts: Date.now() - 1000*60*9,
+    folders: [{n:1, title:'Q3 Roadmap Notes'}],
+  },
+];
+
+// Canned alternate answers used when regenerating a specific assistant
+// message - stands in for a fresh model call in this static preview.
+const REGEN_POOL = [
+  'Reframed: the shared backend engineer is the single biggest scheduling risk - everything else in the quarter is downstream of that one dependency. I\u2019d also flag that "offline sync" has no defined done-state, which makes it hard to know when to stop investing in it.',
+  'A tighter list: (a) one engineer is a single point of failure across two workstreams, (b) the vendor contract renewal date is an unknown that could land badly, (c) the exploratory spike is unscoped, so it competes for time without a clear budget.',
+  'Stepping back further: the real exposure is sequencing, not headcount - if billing migration and onboarding both need the same engineer at their peak weeks, one of them slips regardless of how well each is individually planned.',
+];
+
+// Canned assistant reply used when the composer sends a new message.
+const REPLY_POOL = [
+  'Noted - I don\u2019t have anything filed on that specific point yet, but happy to reason about it from what\u2019s already in the roadmap notes if that helps.',
+  'Based on what\u2019s filed so far, that would mainly affect the billing migration timeline, since it\u2019s the item closest to an external dependency.',
+  'That\u2019s a fair follow-up - want me to fold it into the same risk list, or track it separately?',
+];
+
+let pending = null; // {phase:'thinking'|'crossfade'|'streaming'|'interrupted', revealed, fullAnswer, regenTargetIndex}
+let editingIndex = null;
+let editText = '';
+let copiedKey = null;
+let composerText = '';
+let attachNote = '';
+let menuOpen = false;
+let copiedTimer = null;
+let revealTimer = null;
+let guardTimer = null;
+let stopRequested = false;
+// Explicit "where should focus land after this render" override. Needed
+// whenever the control the user just activated is about to disappear or
+// become disabled (e.g. Stop disables itself once generation is
+// interrupted; the Edit button is replaced by a textarea) - without this,
+// the browser drops focus to <body> and keyboard navigation stalls.
+let pendingFocusKey = null;
+
+const MIN_THINK_MS = 400;
+const REVEAL_CHARS_PER_TICK = 3;
+const REVEAL_TICK_MS = 16;
+
+function getDisplayContent(m) {
+  if (m.variants && m.variants.length) return m.variants[m.activeVariant].content;
+  return m.content;
+}
+
+function formatMsgTime(ts) {
+  try { return new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+  catch { return ''; }
+}
+
+// ---------- render ----------
+const root = document.getElementById('root');
+
+function render() {
+  const activeKey = pendingFocusKey || (document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.focusKey : null);
+  const caret = (!pendingFocusKey && document.activeElement && document.activeElement.tagName === 'TEXTAREA') ? document.activeElement.selectionStart : null;
+  pendingFocusKey = null;
+
+  clear(root);
+
+  const totalAssistantCount = messages.filter(m => m.role === 'assistant').length;
+  const pendingTabBase = 4 + totalAssistantCount * 6;
+  let assistantSeq = -1;
+
+  const threadChildren = [];
+  if (messages.length === 0) {
+    threadChildren.push(el('p', {class:'muted', style:{padding:'0 6px'}}, 'Talk to me.'));
+  }
+  messages.forEach((m, i) => {
+    const isAssistant = m.role === 'assistant';
+    if (isAssistant) assistantSeq += 1;
+    const rowTabBase = isAssistant ? 4 + assistantSeq * 6 : null;
+    const displayContent = isAssistant ? getDisplayContent(m) : m.content;
+    const isEditing = editingIndex === i;
+    const activeVariant = m.activeVariant || 0;
+
+    const bubbleOrEdit = isEditing
+      ? el('div', {class:'msg-edit-wrap'},
+          el('textarea', {
+            class:'msg-edit-textarea', 'aria-label':'Edit response text',
+            focusKey:'edit-ta-' + i,
+            oninput: e => { editText = e.target.value; },
+          }, editText),
+          el('div', {class:'msg-edit-actions'},
+            el('button', {type:'button', class:'secondary', focusKey:'edit-cancel-'+i, onclick: () => cancelEdit(i)}, 'Cancel'),
+            el('button', {type:'button', focusKey:'edit-save-'+i, onclick: () => saveEdit(i)}, 'Save')))
+      : el('div', {class:'msg ' + m.role}, displayContent);
+
+    const row = el('div', {class:'msg-row ' + m.role},
+      el('div', {class:'msg-row-meta'},
+        el('span', {class:'msg-row-name'}, m.role === 'user' ? 'You' : 'Alleah'),
+        m.ts ? el('span', {class:'msg-row-time'}, formatMsgTime(m.ts)) : null),
+      bubbleOrEdit,
+      (isAssistant && !isEditing && m.variants && m.variants.length > 1)
+        ? el('div', {class:'variant-nav'},
+            el('button', {type:'button', class:'variant-nav-btn', tabIndex:rowTabBase, focusKey:'var-prev-'+i,
+              'aria-label':'Previous response', disabled: activeVariant <= 0,
+              onclick: () => {
+                const next = Math.max(0, activeVariant - 1);
+                m.activeVariant = next;
+                // If this click just reached the first variant, this same
+                // button is about to disable itself - keep focus on the
+                // still-enabled Next arrow instead of dropping it.
+                pendingFocusKey = next === 0 ? 'var-next-' + i : 'var-prev-' + i;
+                render();
+              }}, '\u2039'),
+            el('span', {class:'variant-nav-label'}, 'Response ' + (activeVariant + 1) + ' of ' + m.variants.length),
+            el('button', {type:'button', class:'variant-nav-btn', tabIndex:rowTabBase+1, focusKey:'var-next-'+i,
+              'aria-label':'Next response', disabled: activeVariant >= m.variants.length - 1,
+              onclick: () => {
+                const next = Math.min(m.variants.length - 1, activeVariant + 1);
+                m.activeVariant = next;
+                pendingFocusKey = next === m.variants.length - 1 ? 'var-prev-' + i : 'var-next-' + i;
+                render();
+              }}, '\u203a'))
+        : null,
+      (isAssistant && !isEditing)
+        ? msgActionRow({
+            tabBase: rowTabBase + 2, copied: copiedKey === i,
+            onCopy: () => copyToClipboard(displayContent, i), copyDisabled: false,
+            onEdit: () => startEdit(i), editDisabled: !!pending,
+            onRegenerate: () => regenerateMessage(i), regenDisabled: !!pending,
+            onStop: () => {}, stopDisabled: true,
+            keyPrefix: 'row-' + i,
+          })
+        : null);
+
+    threadChildren.push(row);
+    if (m.folders && m.folders.length) {
+      threadChildren.push(el('div', {class:'cites'}, 'memory: ' + m.folders.map(f => '[' + f.n + '] ' + f.title).join('  ')));
+    }
+  });
+
+  if (pending) threadChildren.push(pendingBubble(pendingTabBase));
+
+  const thread = el('div', {id:'thread'}, threadChildren);
+
+  const menu = el('div', {class:'header-actions'},
+    el('button', {type:'button', class:'menu-btn', 'aria-label':'Conversation history', title:'Not part of this preview',
+      onclick: () => flashAttach('History isn\u2019t part of this preview.')}, '\uD83D\uDD5B'),
+    el('div', {style:{position:'relative'}},
+      el('button', {type:'button', class:'menu-btn', 'aria-haspopup':'menu', 'aria-expanded':menuOpen,
+        'aria-label': menuOpen ? 'Close menu' : 'Open menu',
+        onclick: () => { menuOpen = !menuOpen; render(); }}, '\u2630'),
+      menuOpen ? el('div', {class:'menu-dropdown', role:'menu'},
+        el('button', {type:'button', role:'menuitem', class:'menu-item active'}, 'Chat'),
+        el('button', {type:'button', role:'menuitem', class:'menu-item', disabled:true}, 'Tasks (not in this preview)'),
+        el('button', {type:'button', role:'menuitem', class:'menu-item', disabled:true}, 'Goals (not in this preview)'),
+        el('button', {type:'button', role:'menuitem', class:'menu-item', disabled:true}, 'Upgrades (not in this preview)'),
+        el('p', null, 'This preview isolates the message action toolbar feature; header buttons keep the browser\u2019s default tab order, so they always come last after the composer and message actions.'))
+        : null));
+
+  const header = el('header', null,
+    el('h1', null, 'Alleah', el('span', {class:'preview-flag'}, 'Preview')),
+    menu);
+
+  const composer = el('div', {class:'composer'},
+    attachNote ? el('div', {class:'attach-note'}, attachNote) : null,
+    el('button', {type:'button', class:'attach-btn', tabIndex:1, focusKey:'attach', 'aria-label':'Attach file',
+      onclick: () => flashAttach('Attachments aren\u2019t supported in this preview.')}, '\uD83D\uDCCE'),
+    el('textarea', {tabIndex:2, focusKey:'composer-ta', placeholder:'Message Alleah...', rows:1,
+      oninput: e => {
+        composerText = e.target.value;
+        // Avoid a full render() on every keystroke (that would fight the
+        // caret); just keep the Send button's enabled state in sync.
+        const sendBtn = root.querySelector('[data-focus-key="composer-send"]');
+        if (sendBtn && !pending) sendBtn.disabled = !composerText.trim();
+      },
+      onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } },
+    }, composerText),
+    pending && pending.phase !== 'interrupted'
+      ? el('button', {type:'button', class:'stop-btn', tabIndex:3, focusKey:'composer-send', onclick: stop}, 'Stop')
+      : el('button', {tabIndex:3, focusKey:'composer-send', disabled: !composerText.trim(), onclick: send}, 'Send'));
+
+  root.appendChild(header);
+  root.appendChild(el('div', {class:'thread-wrap'}, thread));
+  root.appendChild(composer);
+
+  if (activeKey) {
+    let found = root.querySelector('[data-focus-key="' + String(activeKey).replace(/"/g,'\\"') + '"]');
+    // Safety net: if the target control is disabled (e.g. Stop just
+    // disabled itself, or a variant-nav arrow hit its boundary), a
+    // disabled element can't hold focus - fall back to the nearest still-
+    // enabled control in the same toolbar rather than silently dropping
+    // focus to <body>.
+    if (found && found.disabled) {
+      const toolbar = found.closest('.msg-actions, .variant-nav, .upgrade-actions');
+      found = toolbar ? toolbar.querySelector('button:not(:disabled)') : null;
+    }
+    if (found) {
+      found.focus();
+      if (caret != null && found.tagName === 'TEXTAREA') { try { found.selectionStart = found.selectionEnd = caret; } catch {} }
+    }
+  }
+}
+
+function msgActionRow(p) {
+  return el('div', {class:'msg-actions', role:'toolbar', 'aria-label':'Message actions'},
+    el('button', {type:'button', class:'msg-action-btn', tabIndex:p.tabBase, focusKey:p.keyPrefix+'-copy',
+      'aria-label':'Copy response', disabled:p.copyDisabled, onclick:p.onCopy}, p.copied ? '\u2713' : '\uD83D\uDCCB'),
+    el('button', {type:'button', class:'msg-action-btn', tabIndex:p.tabBase+1, focusKey:p.keyPrefix+'-edit',
+      'aria-label':'Edit response', disabled:p.editDisabled, onclick:p.onEdit}, '\u270E'),
+    el('button', {type:'button', class:'msg-action-btn', tabIndex:p.tabBase+2, focusKey:p.keyPrefix+'-regen',
+      'aria-label':'Regenerate response', disabled:p.regenDisabled, onclick:p.onRegenerate}, '\u27F2'),
+    el('button', {type:'button', class:'msg-action-btn', tabIndex:p.tabBase+3, focusKey:p.keyPrefix+'-stop',
+      'aria-label':'Stop generating', disabled:p.stopDisabled, onclick:p.onStop}, '\u23F9'),
+    p.copied ? el('span', {role:'status', 'aria-live':'polite', class:'msg-action-status'}, 'Copied') : null);
+}
+
+function pendingBubble(tabBase) {
+  const p = pending;
+  if (p.phase === 'interrupted') {
+    const hasPartial = !!(p.revealed && p.revealed.length);
+    return el('div', {class:'msg-row assistant'},
+      el('div', {class:'msg-row-meta'}, el('span', {class:'msg-row-name'}, 'Alleah')),
+      el('div', {class:'msg assistant pending'},
+        hasPartial ? el('span', null, p.revealed) : null,
+        el('div', {class:'interrupted-note'}, (hasPartial ? '\u23F8 ' : '\u23F9 ') + (hasPartial ? 'Generation stopped.' : 'Stopped before generating a response.')),
+        el('div', {class:'upgrade-actions'},
+          hasPartial ? el('button', {type:'button', class:'secondary', focusKey:'pending-continue-btn', onclick: continueGen}, 'Continue') : null,
+          el('button', {type:'button', class:'secondary', focusKey:'pending-regen-secondary', onclick: () => retryFromInterrupted()}, 'Regenerate'))),
+      msgActionRow({
+        tabBase, copied: copiedKey === 'pending',
+        onCopy: () => copyToClipboard(p.revealed || '', 'pending'), copyDisabled: !hasPartial,
+        onEdit: () => {}, editDisabled: true,
+        onRegenerate: () => retryFromInterrupted(), regenDisabled: false,
+        onStop: () => {}, stopDisabled: true,
+        keyPrefix: 'pending',
+      }));
+  }
+  const showDots = p.phase === 'thinking' || p.phase === 'crossfade';
+  const showText = p.phase === 'crossfade' || p.phase === 'streaming';
+  const hasText = !!(p.revealed && p.revealed.length);
+  return el('div', {class:'msg-row assistant'},
+    el('div', {class:'msg-row-meta'}, el('span', {class:'msg-row-name'}, 'Alleah')),
+    el('div', {class:'msg assistant pending'},
+      el('div', {class:'stream-wrap'},
+        showDots ? el('div', {class:'think-row' + (p.phase === 'crossfade' ? ' fade-out' : ''), role:'status', 'aria-live':'polite', 'aria-label':'Alleah is thinking'},
+          el('span', {class:'think-label'}, 'Thinking'),
+          el('span', {class:'think-dots'},
+            el('span', {class:'think-dot', style:{animationDelay:'0s'}}, '\u2022'),
+            el('span', {class:'think-dot', style:{animationDelay:'.15s'}}, '\u2022'),
+            el('span', {class:'think-dot', style:{animationDelay:'.3s'}}, '\u2022'))) : null,
+        showText ? el('span', {class:'stream-text show'}, p.revealed, el('span', {class:'stream-cursor'})) : null)),
+    msgActionRow({
+      tabBase, copied: copiedKey === 'pending',
+      onCopy: () => copyToClipboard(p.revealed || '', 'pending'), copyDisabled: !hasText,
+      onEdit: () => {}, editDisabled: true,
+      onRegenerate: () => {}, regenDisabled: true,
+      onStop: stop, stopDisabled: false,
+      keyPrefix: 'pending',
+    }));
+}
+
+// ---------- actions ----------
+function flashAttach(text) {
+  attachNote = text;
+  render();
+  setTimeout(() => { attachNote = ''; render(); }, 2200);
+}
+
+function copyToClipboard(text, key) {
+  function mark() {
+    copiedKey = key;
+    render();
+    if (copiedTimer) clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => { copiedKey = null; render(); }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(mark, mark);
+  } else { mark(); }
+}
+
+function startEdit(i) {
+  editingIndex = i;
+  editText = getDisplayContent(messages[i]);
+  pendingFocusKey = 'edit-ta-' + i; // move focus into the textarea that's about to appear
+  render();
+}
+
+function cancelEdit(i) {
+  editingIndex = null; editText = '';
+  pendingFocusKey = 'row-' + i + '-edit'; // return focus to the row's Edit button, which reappears
+  render();
+}
+
+function saveEdit(i) {
+  const msg = messages[i];
+  if (msg.variants && msg.variants.length) {
+    msg.variants[msg.activeVariant] = {...msg.variants[msg.activeVariant], content: editText};
+  } else {
+    msg.content = editText;
+  }
+  editingIndex = null; editText = '';
+  pendingFocusKey = 'row-' + i + '-edit';
+  render();
+}
+
+function clearTimers() {
+  if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
+  if (guardTimer) { clearTimeout(guardTimer); guardTimer = null; }
+}
+
+function pickCanned(pool, seed) {
+  return pool[seed % pool.length];
+}
+
+// Regenerating a specific assistant row keeps its current output as a
+// comparable variant instead of overwriting it - see finalize() below.
+// This is the heart of the feature: prior answers are never discarded.
+function regenerateMessage(i) {
+  if (pending || editingIndex != null) return;
+  const m = messages[i];
+  const seed = (m.variants ? m.variants.length : 0) + i;
+  startGeneration(pickCanned(REGEN_POOL, seed), i);
+}
+
+function retryFromInterrupted() {
+  const target = pending ? pending.regenTargetIndex : null;
+  clearTimers();
+  pending = null;
+  if (target != null) regenerateMessage(target);
+  else send(true);
+}
+
+function startGeneration(fullAnswer, regenTargetIndex) {
+  clearTimers();
+  stopRequested = false;
+  pending = {phase:'thinking', revealed:'', fullAnswer:null, regenTargetIndex: regenTargetIndex == null ? null : regenTargetIndex};
+  pendingFocusKey = 'pending-stop'; // Stop is the live control for the duration of generation
+  render();
+  const start = Date.now();
+  guardTimer = setTimeout(() => {
+    if (!pending || stopRequested) return;
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, MIN_THINK_MS - elapsed);
+    guardTimer = setTimeout(() => {
+      if (!pending || stopRequested) return;
+      pending = {...pending, phase:'crossfade', fullAnswer};
+      render();
+      startReveal();
+    }, remaining);
+  }, 10);
+}
+
+function startReveal() {
+  if (revealTimer) clearInterval(revealTimer);
+  revealTimer = setInterval(() => {
+    if (!pending || pending.fullAnswer == null) return;
+    const nextLen = Math.min((pending.revealed || '').length + REVEAL_CHARS_PER_TICK, pending.fullAnswer.length);
+    pending = {...pending, revealed: pending.fullAnswer.slice(0, nextLen), phase: pending.phase === 'crossfade' ? 'streaming' : pending.phase};
+    if (nextLen >= pending.fullAnswer.length) {
+      clearInterval(revealTimer); revealTimer = null;
+      finalize();
+    } else {
+      render();
+    }
+  }, REVEAL_TICK_MS);
+}
+
+// Preserves prior output as a comparable variant on regenerate rather
+// than overwriting it (the proposal's core requirement).
+function finalize() {
+  const p = pending;
+  if (!p) return;
+  if (p.regenTargetIndex != null) {
+    const idx = p.regenTargetIndex;
+    const msg = messages[idx];
+    const priorVariants = msg.variants && msg.variants.length
+      ? msg.variants
+      : [{content: msg.content, ts: msg.ts}];
+    msg.variants = [...priorVariants, {content: p.fullAnswer, ts: Date.now()}];
+    msg.activeVariant = msg.variants.length - 1;
+    pendingFocusKey = 'row-' + idx + '-regen'; // pending bubble is gone; hand focus back to that row's Regenerate
+  } else {
+    messages.push({role:'assistant', content: p.fullAnswer, ts: Date.now()});
+    pendingFocusKey = 'composer-ta';
+  }
+  pending = null;
+  render();
+}
+
+function send(retry) {
+  if (!retry) {
+    const content = composerText.trim();
+    if (!content || pending) return;
+    messages.push({role:'user', content, ts: Date.now()});
+    composerText = '';
+  }
+  const seed = messages.length;
+  startGeneration(pickCanned(REPLY_POOL, seed), null);
+}
+
+function stop() {
+  stopRequested = true;
+  clearTimers();
+  if (!pending) return;
+  pending = {...pending, phase:'interrupted'};
+  // Stop just disabled itself (stopDisabled is always true once
+  // interrupted) - hand focus to the action row's Regenerate button,
+  // which is enabled in this phase, instead of letting it fall to <body>.
+  pendingFocusKey = 'pending-regen';
+  render();
+}
+
+function continueGen() {
+  if (!pending || pending.fullAnswer == null) return;
+  pending = {...pending, phase:'streaming'};
+  pendingFocusKey = 'pending-stop'; // the Continue button that was just clicked is about to vanish
+  render();
+  startReveal();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && menuOpen) { menuOpen = false; render(); }
+});
+document.addEventListener('click', e => {
+  if (menuOpen && !e.target.closest('.header-actions')) { menuOpen = false; render(); }
+});
+
+render();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="5e5bc4b1-r0-1786912186">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "5e5bc4b1-5860-415b-95ca-49ebeb8d5829", "revision": 0, "deploy_marker": "5e5bc4b1-r0-1786912186", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
