@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Alleah — Updates</title>
+<meta name="theme-color" content="#121212">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#121212;
+  --surface:#1c1c1e;
+  --surface-2:#242427;
+  --border:#3a3a3d;
+  --text-primary:#f2f2f3;
+  --text-secondary:#b7bac0;
+  --accent:#3ddb96;
+  --accent-contrast:#06120c;
+  --focus-ring:#7db8ff;
+  --vvh:100dvh;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f6f6f7;
+  --surface:#ffffff;
+  --surface-2:#edeef0;
+  --border:#d6d8db;
+  --text-primary:#17181a;
+  --text-secondary:#53565c;
+  --accent:#0e7a4a;
+  --accent-contrast:#ffffff;
+  --focus-ring:#0b5fb8;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100dvh;height:var(--vvh,100dvh);max-width:680px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px;gap:8px;flex:none}
+h1{font-size:18px;margin:0}
+.header-actions{display:flex;gap:8px;align-items:center}
+.theme-btn{width:44px;height:44px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:12px;padding:0;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.theme-btn:active{background:var(--surface-2)}
+.tabbar{display:flex;gap:6px;overflow-x:auto;padding:0 14px 10px;flex:none}
+.tabbtn{flex:none;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border);border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.tabbtn.active{background:var(--text-primary);color:var(--bg);border-color:var(--text-primary)}
+.placeholder{flex:1;display:flex;align-items:center;justify-content:center;padding:30px;text-align:center;color:var(--text-secondary);font-size:14.5px}
+button{background:var(--accent);color:var(--accent-contrast);border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+
+/* ===== Updates tab: radial "snowflake" systems map ===== */
+.updates-view{flex:1;position:relative;overflow:hidden;min-height:0;background:radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 6%, var(--bg)) 0%, var(--bg) 70%)}
+.map-viewport{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
+.map-viewport.grabbing{cursor:grabbing}
+.map-world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.map-lines{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.map-node{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;text-align:center;cursor:pointer;user-select:none;transform:translate(-50%,-50%);transition:filter .15s ease}
+.map-node-label{font-size:13px;font-weight:700;padding:0 8px;line-height:1.15;pointer-events:none;color:var(--text-primary)}
+.map-node-sub{font-size:10px;opacity:.8;margin-top:2px;pointer-events:none;color:var(--text-secondary)}
+.map-node-center{width:132px;height:132px;background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 55%, var(--surface)), var(--surface-2));border:2px solid var(--accent);box-shadow:0 0 26px 6px color-mix(in srgb, var(--accent) 35%, transparent);z-index:2}
+.map-node-center .map-node-label{font-size:16px;letter-spacing:.03em}
+.map-node-system{width:104px;height:104px;background:var(--surface-2);border:2px solid var(--border);z-index:1}
+.map-node-idle{opacity:.68}
+.map-node-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:999px;background:#ff8a3d;color:#2b1200;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 0 0 2px var(--bg)}
+.map-node-pulse-1{border-color:#c9702f;background:radial-gradient(circle at 35% 30%, rgba(255,138,61,.35), var(--surface-2));animation:mapPulse1 3.2s ease-in-out infinite}
+.map-node-pulse-2{border-color:#e8631f;background:radial-gradient(circle at 35% 30%, rgba(255,138,61,.45), var(--surface-2));animation:mapPulse2 1.8s ease-in-out infinite}
+.map-node-pulse-3{border-color:#ff8a3d;background:radial-gradient(circle at 35% 30%, rgba(255,138,61,.55), var(--surface-2));animation:mapPulse3 .85s ease-in-out infinite}
+@keyframes mapPulse1{0%,100%{box-shadow:0 0 6px 2px rgba(255,138,61,.3);filter:brightness(1)}50%{box-shadow:0 0 14px 5px rgba(255,138,61,.55);filter:brightness(1.12)}}
+@keyframes mapPulse2{0%,100%{box-shadow:0 0 10px 3px rgba(255,138,61,.45);filter:brightness(1.02)}50%{box-shadow:0 0 22px 8px rgba(255,138,61,.8);filter:brightness(1.28)}}
+@keyframes mapPulse3{0%,100%{box-shadow:0 0 14px 4px rgba(255,138,61,.6);filter:brightness(1.08)}50%{box-shadow:0 0 34px 12px rgba(255,153,51,1);filter:brightness(1.55)}}
+.map-zoom-controls{position:absolute;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:5}
+.map-zoom-btn{width:44px;height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text-primary);font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.map-zoom-btn:active{background:var(--surface-2)}
+.map-hint{position:absolute;left:14px;top:14px;z-index:5;font-size:11.5px;color:var(--text-secondary);background:color-mix(in srgb, var(--surface) 78%, transparent);border:1px solid var(--border);border-radius:999px;padding:6px 12px;pointer-events:none}
+.update-panel{position:absolute;left:0;right:0;top:0;height:34%;min-height:210px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 16px 32px rgba(0,0,0,.4);z-index:20;display:flex;flex-direction:column}
+.update-panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 8px 0 14px;flex:none}
+.update-panel-tabs{display:flex;gap:6px}
+.update-panel-tab{background:var(--surface-2);color:var(--text-secondary);border:1px solid var(--border);border-radius:999px;padding:7px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.update-panel-tab.active{background:var(--text-primary);color:var(--bg);border-color:var(--text-primary)}
+.update-panel-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;margin-left:6px;border-radius:999px;background:#ff8a3d;color:#2b1200;font-size:10px;font-weight:800;padding:0 4px}
+.update-panel-close{width:40px;height:40px;flex:none;background:transparent;border:0;color:var(--text-secondary);font-size:18px;border-radius:10px;cursor:pointer}
+.update-panel-close:active{background:var(--surface-2)}
+.update-panel-name{font-size:15px;font-weight:700;margin:10px 14px 0;color:var(--text-primary)}
+.update-panel-body{flex:1;min-height:0;overflow-y:auto;padding:8px 16px 18px;-webkit-overflow-scrolling:touch}
+.update-panel-about{color:var(--text-secondary);font-size:14.5px;white-space:pre-wrap;margin:0}
+.update-panel-update-item + .update-panel-update-item{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.update-panel-update-title{font-size:14.5px;font-weight:700;margin:0 0 4px;color:var(--text-primary)}
+.update-panel-update-body{font-size:14px;color:var(--text-secondary);margin:0;white-space:pre-wrap}
+</style></head><body>
+<div id="root">
+  <header>
+    <h1>Alleah</h1>
+    <div class="header-actions">
+      <button type="button" class="theme-btn" id="themeBtn" aria-label="Toggle theme">☀️</button>
+    </div>
+  </header>
+  <div class="tabbar" id="tabbar">
+    <button type="button" class="tabbtn" data-tab="chat">Chat</button>
+    <button type="button" class="tabbtn" data-tab="tasks">Tasks</button>
+    <button type="button" class="tabbtn" data-tab="goals">Goals</button>
+    <button type="button" class="tabbtn active" data-tab="updates">Updates</button>
+  </div>
+  <div id="viewHost" style="flex:1;min-height:0;display:flex;flex-direction:column;"></div>
+</div>
+<script>
+(function(){
+  'use strict';
+
+  // ===== Theme toggle (visual parity only; no persistence needed for a preview) =====
+  var themeBtn = document.getElementById('themeBtn');
+  var theme = 'dark';
+  themeBtn.addEventListener('click', function(){
+    theme = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  });
+
+  // ===== Fake tab switching: this preview focuses on the Updates tab =====
+  var tabbar = document.getElementById('tabbar');
+  var viewHost = document.getElementById('viewHost');
+  tabbar.addEventListener('click', function(e){
+    var btn = e.target.closest('.tabbtn');
+    if (!btn) return;
+    Array.prototype.forEach.call(tabbar.querySelectorAll('.tabbtn'), function(b){ b.classList.toggle('active', b === btn); });
+    var tab = btn.getAttribute('data-tab');
+    if (tab === 'updates') { renderUpdatesView(); }
+    else {
+      viewHost.innerHTML = '';
+      var p = document.createElement('div');
+      p.className = 'placeholder';
+      p.textContent = 'This preview focuses on the redesigned Updates tab. Switch back to "Updates" above to explore the systems map.';
+      viewHost.appendChild(p);
+    }
+  });
+
+  // ===== Fixture data =====
+  var MAP_WORLD_SIZE = 1000;
+  var MAP_CENTER = MAP_WORLD_SIZE / 2;
+  var MAP_RADIUS = 320;
+  var MAP_MIN_ZOOM = 0.45;
+  var MAP_MAX_ZOOM = 2.4;
+
+  var ALLEAH_NODE = {
+    id: 'alleah',
+    name: 'ALLEAH',
+    isCenter: true,
+    description: 'The core assistant orchestrating every connected system around it \u2014 routing memory, tasks and decisions across Calendar, Curriculum, Blueprint, Staging, Goals and Reminders.',
+    updates: []
+  };
+
+  var SYSTEMS_RAW = [
+    {
+      id:'calendar', name:'Calendar',
+      description:'Tracks scheduled sessions, deadlines and reminders across your day, syncing lightweight events into planning conversations.',
+      updates:[
+        {id:'cal-1', title:'Recurring event sync', body:'Weekly recurring events created in chat are now deduplicated before being written to the calendar feed, so a repeated "every Monday" request no longer creates duplicate entries when mentioned twice.'},
+        {id:'cal-2', title:'Timezone fallback', body:'When a session doesn\u2019t specify a timezone, Calendar now falls back to the device\u2019s local timezone instead of UTC, matching what Reminders already does.'}
+      ]
+    },
+    {
+      id:'curriculum', name:'Curriculum',
+      description:'Houses the structured lesson plans and skill sequences Alleah references when tutoring or building a learning path.',
+      updates:[]
+    },
+    {
+      id:'blueprint', name:'Blueprint',
+      description:'Stores the architectural plan for features and system changes before they\u2019re built, keeping design decisions in one place.',
+      updates:[
+        {id:'bp-1', title:'Draft versioning', body:'Blueprint now keeps the last 5 drafts of a plan instead of overwriting in place, so an earlier revision can be recovered if a later edit removes something useful.'},
+        {id:'bp-2', title:'Cross-link to Goals', body:'Plans that reference a goal by name are now cross-linked automatically, so opening a Blueprint entry shows which active goal it supports.'},
+        {id:'bp-3', title:'Section reordering', body:'Sections within a blueprint can now be reordered by dragging, rather than requiring the whole document to be rewritten to change section order.'}
+      ]
+    },
+    {
+      id:'staging', name:'Staging',
+      description:'A holding area where in-progress builds and revisions are tested before being promoted to the live app.',
+      updates:[
+        {id:'st-1', title:'Preview retention window', body:'Preview builds now stay reachable for 72 hours after a task completes instead of 24, giving more time to review before a preview link expires.'}
+      ]
+    },
+    {
+      id:'goals', name:'Goals',
+      description:'Tracks longer-term objectives and the mini-steps that break them down into daily actions.',
+      updates:[]
+    },
+    {
+      id:'reminders', name:'Reminders',
+      description:'Surfaces time-sensitive nudges and follow-ups so nothing important gets lost in conversation.',
+      updates:[
+        {id:'rm-1', title:'Snooze presets', body:'Reminders can now be snoozed using quick presets (15m, 1h, tomorrow morning) instead of only a custom date/time picker, cutting the taps needed for a routine snooze.'},
+        {id:'rm-2', title:'Digest grouping', body:'When more than three reminders land within the same hour, they\u2019re now grouped into a single digest notification rather than arriving as separate pings.'},
+        {id:'rm-3', title:'Location-aware nudges (experimental)', body:'An experimental mode surfaces a reminder early if it\u2019s tied to a place and the device appears to be near that place, falling back to the scheduled time otherwise.'},
+        {id:'rm-4', title:'Stale reminder cleanup', body:'Reminders left unacknowledged for more than 30 days are now flagged for review instead of silently expiring, so nothing important gets lost.'}
+      ]
+    }
+  ];
+
+  var SYSTEMS = SYSTEMS_RAW.map(function(s, i){
+    var angle = (-90 + i * (360 / SYSTEMS_RAW.length)) * Math.PI / 180;
+    var node = {};
+    for (var k in s) node[k] = s[k];
+    node.isCenter = false;
+    node.x = MAP_CENTER + MAP_RADIUS * Math.cos(angle);
+    node.y = MAP_CENTER + MAP_RADIUS * Math.sin(angle);
+    return node;
+  });
+
+  function findNode(id) {
+    if (id === 'alleah') return ALLEAH_NODE;
+    for (var i = 0; i < SYSTEMS.length; i++) if (SYSTEMS[i].id === id) return SYSTEMS[i];
+    return null;
+  }
+
+  function pulseBucket(count) {
+    if (!count) return 0;
+    if (count === 1) return 1;
+    if (count === 2) return 2;
+    return 3;
+  }
+
+  // ===== Build the Updates view (map + panel) =====
+  function renderUpdatesView() {
+    viewHost.innerHTML = '';
+
+    var view = document.createElement('div');
+    view.className = 'updates-view';
+
+    var viewport = document.createElement('div');
+    viewport.className = 'map-viewport';
+
+    var world = document.createElement('div');
+    world.className = 'map-world';
+    world.style.width = MAP_WORLD_SIZE + 'px';
+    world.style.height = MAP_WORLD_SIZE + 'px';
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('class', 'map-lines');
+    svg.setAttribute('width', MAP_WORLD_SIZE);
+    svg.setAttribute('height', MAP_WORLD_SIZE);
+    SYSTEMS.forEach(function(s){
+      var line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', MAP_CENTER); line.setAttribute('y1', MAP_CENTER);
+      line.setAttribute('x2', s.x); line.setAttribute('y2', s.y);
+      line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '2');
+      svg.appendChild(line);
+    });
+    world.appendChild(svg);
+
+    function buildNodeEl(node) {
+      var el = document.createElement('div');
+      var count = node.isCenter ? 0 : node.updates.length;
+      var bucket = pulseBucket(count);
+      var cls = ['map-node', node.isCenter ? 'map-node-center' : 'map-node-system'];
+      if (!node.isCenter) {
+        if (bucket === 0) cls.push('map-node-idle');
+        else cls.push('map-node-pulse-' + bucket);
+      }
+      el.className = cls.join(' ');
+      el.style.left = (node.isCenter ? MAP_CENTER : node.x) + 'px';
+      el.style.top = (node.isCenter ? MAP_CENTER : node.y) + 'px';
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', node.isCenter ? node.name : (node.name + (count ? ', ' + count + ' pending update' + (count === 1 ? '' : 's') : ', up to date')));
+
+      var label = document.createElement('span');
+      label.className = 'map-node-label';
+      label.textContent = node.name;
+      el.appendChild(label);
+
+      if (!node.isCenter) {
+        var sub = document.createElement('span');
+        sub.className = 'map-node-sub';
+        sub.textContent = count ? (count + ' pending') : 'up to date';
+        el.appendChild(sub);
+        if (count) {
+          var badge = document.createElement('span');
+          badge.className = 'map-node-badge';
+          badge.textContent = String(count);
+          el.appendChild(badge);
+        }
+      }
+
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        openPanel(node.id);
+      });
+      el.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPanel(node.id); }
+      });
+      return el;
+    }
+
+    world.appendChild(buildNodeEl(ALLEAH_NODE));
+    SYSTEMS.forEach(function(s){ world.appendChild(buildNodeEl(s)); });
+
+    var hint = document.createElement('div');
+    hint.className = 'map-hint';
+    hint.textContent = 'Drag to pan \u00b7 scroll or +/\u2212 to zoom';
+
+    viewport.appendChild(world);
+    view.appendChild(viewport);
+    view.appendChild(hint);
+
+    var zoomControls = document.createElement('div');
+    zoomControls.className = 'map-zoom-controls';
+    var zoomInBtn = document.createElement('button');
+    zoomInBtn.type = 'button'; zoomInBtn.className = 'map-zoom-btn'; zoomInBtn.setAttribute('aria-label','Zoom in'); zoomInBtn.textContent = '+';
+    var zoomOutBtn = document.createElement('button');
+    zoomOutBtn.type = 'button'; zoomOutBtn.className = 'map-zoom-btn'; zoomOutBtn.setAttribute('aria-label','Zoom out'); zoomOutBtn.textContent = '\u2212';
+    zoomControls.appendChild(zoomInBtn);
+    zoomControls.appendChild(zoomOutBtn);
+    view.appendChild(zoomControls);
+
+    viewHost.appendChild(view);
+
+    // ===== Pan / zoom state =====
+    var zoom = 1, panX = 0, panY = 0;
+    var rect = viewport.getBoundingClientRect();
+    panX = rect.width / 2 - MAP_CENTER;
+    panY = rect.height / 2 - MAP_CENTER;
+
+    function applyTransform() {
+      world.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+    }
+    applyTransform();
+
+    function applyZoom(nextZoomRaw, originX, originY) {
+      var nextZoom = Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM, nextZoomRaw));
+      var worldX = (originX - panX) / zoom;
+      var worldY = (originY - panY) / zoom;
+      panX = originX - worldX * nextZoom;
+      panY = originY - worldY * nextZoom;
+      zoom = nextZoom;
+      applyTransform();
+    }
+
+    zoomInBtn.addEventListener('click', function(){
+      var r = viewport.getBoundingClientRect();
+      applyZoom(zoom * 1.25, r.width / 2, r.height / 2);
+    });
+    zoomOutBtn.addEventListener('click', function(){
+      var r = viewport.getBoundingClientRect();
+      applyZoom(zoom / 1.25, r.width / 2, r.height / 2);
+    });
+
+    viewport.addEventListener('wheel', function(e){
+      e.preventDefault();
+      var r = viewport.getBoundingClientRect();
+      var originX = e.clientX - r.left, originY = e.clientY - r.top;
+      var factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      applyZoom(zoom * factor, originX, originY);
+    }, {passive:false});
+
+    var drag = null, wasDrag = false;
+    function beginDrag(x, y) { drag = {startX:x, startY:y, panX:panX, panY:panY}; wasDrag = false; viewport.classList.add('grabbing'); }
+    function moveDrag(x, y) {
+      if (!drag) return;
+      var dx = x - drag.startX, dy = y - drag.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) wasDrag = true;
+      panX = drag.panX + dx; panY = drag.panY + dy;
+      applyTransform();
+    }
+    function endDrag() { drag = null; viewport.classList.remove('grabbing'); }
+
+    viewport.addEventListener('mousedown', function(e){ if (e.button !== 0) return; beginDrag(e.clientX, e.clientY); });
+    window.addEventListener('mousemove', function(e){ moveDrag(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', function(){ endDrag(); });
+    viewport.addEventListener('touchstart', function(e){ if (e.touches[0]) beginDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+    window.addEventListener('touchmove', function(e){ if (e.touches[0]) moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+    window.addEventListener('touchend', function(){ endDrag(); });
+
+    viewport.addEventListener('click', function(){
+      if (wasDrag) { wasDrag = false; return; }
+      closePanel();
+    });
+
+    // ===== Panel =====
+    var panelEl = null, activeTab = 'about';
+
+    function openPanel(id) {
+      activeTab = 'about';
+      renderPanel(id);
+    }
+    function closePanel() {
+      if (panelEl && panelEl.parentNode) panelEl.parentNode.removeChild(panelEl);
+      panelEl = null;
+    }
+    function renderPanel(id) {
+      var node = findNode(id);
+      if (!node) return;
+      closePanel();
+      panelEl = document.createElement('div');
+      panelEl.className = 'update-panel';
+      panelEl.setAttribute('role', 'dialog');
+      panelEl.setAttribute('aria-label', node.name + ' panel');
+
+      var head = document.createElement('div');
+      head.className = 'update-panel-head';
+
+      var tabs = document.createElement('div');
+      tabs.className = 'update-panel-tabs';
+
+      var aboutBtn = document.createElement('button');
+      aboutBtn.type = 'button';
+      aboutBtn.textContent = 'About';
+      tabs.appendChild(aboutBtn);
+
+      var updateBtn = null;
+      if (!node.isCenter) {
+        updateBtn = document.createElement('button');
+        updateBtn.type = 'button';
+        updateBtn.appendChild(document.createTextNode('Update'));
+        if (node.updates.length) {
+          var cnt = document.createElement('span');
+          cnt.className = 'update-panel-tab-count';
+          cnt.textContent = String(node.updates.length);
+          updateBtn.appendChild(cnt);
+        }
+        tabs.appendChild(updateBtn);
+      }
+
+      function refreshTabClasses() {
+        aboutBtn.className = 'update-panel-tab' + (activeTab === 'about' ? ' active' : '');
+        if (updateBtn) updateBtn.className = 'update-panel-tab' + (activeTab === 'update' ? ' active' : '');
+      }
+      refreshTabClasses();
+
+      aboutBtn.addEventListener('click', function(){ activeTab = 'about'; refreshTabClasses(); renderBody(); });
+      if (updateBtn) updateBtn.addEventListener('click', function(){ activeTab = 'update'; refreshTabClasses(); renderBody(); });
+
+      var closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'update-panel-close';
+      closeBtn.setAttribute('aria-label', 'Close panel');
+      closeBtn.textContent = '\u2715';
+      closeBtn.addEventListener('click', closePanel);
+
+      head.appendChild(tabs);
+      head.appendChild(closeBtn);
+
+      var nameEl = document.createElement('p');
+      nameEl.className = 'update-panel-name';
+      nameEl.textContent = node.name;
+
+      var body = document.createElement('div');
+      body.className = 'update-panel-body';
+
+      function renderBody() {
+        body.innerHTML = '';
+        var effectiveTab = node.isCenter ? 'about' : activeTab;
+        if (effectiveTab === 'about') {
+          var p = document.createElement('p');
+          p.className = 'update-panel-about';
+          p.textContent = node.description;
+          body.appendChild(p);
+        } else if (node.updates.length) {
+          node.updates.forEach(function(u){
+            var item = document.createElement('div');
+            item.className = 'update-panel-update-item';
+            var t = document.createElement('p');
+            t.className = 'update-panel-update-title';
+            t.textContent = u.title;
+            var b = document.createElement('p');
+            b.className = 'update-panel-update-body';
+            b.textContent = u.body;
+            item.appendChild(t); item.appendChild(b);
+            body.appendChild(item);
+          });
+        } else {
+          var empty = document.createElement('p');
+          empty.className = 'update-panel-about';
+          empty.textContent = 'No pending updates for this system right now.';
+          body.appendChild(empty);
+        }
+      }
+      renderBody();
+
+      panelEl.appendChild(head);
+      panelEl.appendChild(nameEl);
+      panelEl.appendChild(body);
+      panelEl.addEventListener('click', function(e){ e.stopPropagation(); });
+      view.appendChild(panelEl);
+    }
+  }
+
+  renderUpdatesView();
+})();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="3550fc87-r0-1786989324">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "3550fc87-9d6b-47f5-85b6-f51578c5fc79", "revision": 0, "deploy_marker": "3550fc87-r0-1786989324", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
