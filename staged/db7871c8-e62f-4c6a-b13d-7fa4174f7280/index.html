@@ -1,0 +1,1441 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Alleah</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121212">
+<style>
+/* ===== Design tokens =====
+   WCAG AA contrast pass: dark theme (default) uses a dark-grey surface
+   (~#121212), never pure black, and muted accent hues instead of the
+   fully-saturated brand green so text-on-accent and accent-as-text both
+   clear 4.5:1 (body) / 3:1 (large text, UI components). A light theme is
+   provided via [data-theme="light"] on <html>, toggled from the header
+   menu and persisted to localStorage. Every color in this file - and
+   every inline color set from JS below - reads one of these variables so
+   the whole app (not just chat) stays in sync. */
+:root{
+  color-scheme:dark;
+  --bg:#121212;
+  --surface:#1c1c1e;
+  --surface-2:#242427;
+  --surface-dark:#121212; /* explicit dark-grey surface token, used for the deepest layer */
+  --border:#3a3a3d;
+  --text-primary:#f2f2f3;
+  --text-secondary:#b7bac0;   /* 4.5:1+ on --bg and --surface */
+  --accent:#3ddb96;           /* headline accent kept vivid enough for large text/icons */
+  --accent-muted-dark:#2f9d6c;/* muted accent for dark-mode fills/borders per proposal */
+  --accent-contrast:#06120c;  /* text placed ON an accent-filled control */
+  --danger:#ff9086;
+  --danger-contrast:#2b0705;
+  --warning:#e7b567;
+  --info:#7db8ff;
+  --purple:#dd9dff;
+  --neutral:#9498a1;          /* replaces the old #5c636e, which failed 4.5:1 */
+  --focus-ring:#7db8ff;
+  --vvh: 100dvh; /* live visual-viewport height, kept in sync from JS so the
+                    composer never ends up hidden behind the on-screen
+                    keyboard; falls back to 100dvh itself pre-hydration */
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f6f6f7;
+  --surface:#ffffff;
+  --surface-2:#edeef0;
+  --surface-dark:#121212;
+  --border:#d6d8db;
+  --text-primary:#17181a;
+  --text-secondary:#53565c;
+  --accent:#0e7a4a;          /* darkened vs. dark-theme accent so text/button use both clear 4.5:1 on light surfaces */
+  --accent-muted-dark:#0e7a4a;
+  --accent-contrast:#ffffff;
+  --danger:#b3261e;
+  --danger-contrast:#ffffff;
+  --warning:#8a5a00;
+  --info:#0b5fb8;
+  --purple:#7c3aad;
+  --neutral:#5b5e65;
+  --focus-ring:#0b5fb8;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:16px/1.5 -apple-system,system-ui,sans-serif}
+/* Root height tracks the live visual viewport (via --vvh, updated from JS on
+   resize/visualViewport change) rather than a static 100%, so when the
+   on-screen keyboard opens the whole column - and therefore the composer
+   pinned at its bottom - resizes with it instead of being covered. 100dvh
+   is the static fallback for the instant before JS attaches its listener. */
+#root{height:100dvh;height:var(--vvh,100dvh);max-width:680px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 4px;gap:8px;flex:none}
+h1{font-size:18px;margin:0}
+.header-actions{display:flex;gap:8px;align-items:center}
+#thread{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:10px;min-height:0;-webkit-overflow-scrolling:touch}
+/* Wraps #thread + the "jump to latest" affordance so the latter can be
+   absolutely positioned relative to the scrollable thread, not the page. */
+.thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.jump-latest-btn{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:999px;padding:8px 16px;min-height:40px;font:inherit;font-size:13px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer;z-index:5}
+.jump-latest-btn .badge-count{background:var(--accent);color:var(--accent-contrast);border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-contrast);border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-bottom-left-radius:4px}
+.cites{align-self:flex-start;font-size:12px;color:var(--text-secondary);margin-top:-4px;padding:0 6px}
+/* ===== Message rows (sender + timestamp header above each bubble) =====
+   .msg-row wraps a single turn (meta line + bubble). Spec calls for
+   consistent 16px padding on ALL sides of the row container; a prior
+   audit flagged the first pass as inconsistent per-side, so this uses a
+   single shorthand `padding:16px` (not per-side longhand) to keep all
+   four sides locked together going forward. */
+.msg-row{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:14px}
+.msg-row.user{align-self:flex-end;align-items:flex-end}
+.msg-row.assistant{align-self:flex-start;align-items:flex-start}
+.msg-row-meta{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--text-secondary);padding:0 2px}
+.msg-row-name{font-weight:700;color:var(--text-primary)}
+.msg-row-time{color:var(--text-secondary)}
+.composer{display:flex;gap:8px;align-items:flex-end;padding:10px 14px calc(14px + env(safe-area-inset-bottom));position:relative;flex:none}
+/* Composer-scoped tap-target bump (>=44x44) - deliberately scoped to
+   `.composer button`, not the global `button` rule, so filter pills, menu
+   items etc. elsewhere in the app are unaffected. */
+.composer button{min-height:44px;min-width:44px}
+.attach-btn{width:44px;height:44px;min-width:44px;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:0;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.attach-btn:active{background:var(--surface)}
+.attach-note{position:absolute;left:14px;right:14px;bottom:100%;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary);font-size:12.5px;padding:8px 12px;border-radius:10px;text-align:center}
+textarea{flex:1;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:11px 14px;font:inherit;resize:none;min-height:46px;max-height:min(40dvh,320px);overflow-y:auto;line-height:1.4}
+button{background:var(--accent);color:var(--accent-contrast);border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+button.secondary{background:var(--surface-2);color:var(--text-primary);font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--border)}
+button.stop-btn{background:var(--danger);color:var(--danger-contrast)}
+button.reject-btn{background:var(--danger);color:var(--danger-contrast)}
+button:disabled{opacity:.5}
+input,select{width:100%;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:10px;padding:12px;font:inherit}
+.auth{padding:16px 14px}
+.auth button{padding:12px 18px;margin-top:10px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.muted{color:var(--text-secondary);font-size:14px}
+.err{color:var(--danger);font-size:14px;padding:0 14px}
+.typing{align-self:flex-start;color:var(--text-secondary);font-size:14px;padding:0 6px}
+#tasks,#goals,#upgrades{flex:1;overflow-y:auto;padding:8px 14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--border)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.status-icon{font-size:11px;line-height:1}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.segbar{display:flex;gap:2px;margin:4px 0}
+.seg{flex:1;height:8px;border-radius:2px;background:var(--surface-2)}
+.seg.on{background:var(--accent-muted-dark)}
+.meter{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin:4px 0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:10px 0}
+.meter>div{height:100%;border-radius:4px}
+.small{font-size:12px;color:var(--text-secondary);margin:2px 0}
+.task-full{white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;max-height:320px;overflow-y:auto;font-size:14px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid transparent}
+.filterbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px}
+.filterbtn{flex:none;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border);border-radius:999px;padding:6px 13px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.filterbtn.active{background:var(--text-primary);color:var(--bg);border-color:var(--text-primary)}
+.summary{display:flex;gap:14px;flex-wrap:wrap;padding:2px 2px 10px;color:var(--text-secondary);font-size:12px}
+.summary b{color:var(--text-primary)}
+.goal-desc{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;font-size:13.5px;color:var(--text-secondary)}
+.addform{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.addform .row2{display:flex;gap:8px}
+.addform .row2>*{flex:1}
+.newgoalbtn{width:100%;text-align:left;background:var(--surface);color:var(--text-secondary);border:1px dashed var(--border)}
+.goal-path{display:flex;flex-direction:column}
+.goal-row{display:flex;gap:10px}
+.goal-connector{display:flex;flex-direction:column;align-items:center;width:18px;flex:none}
+.goal-node-dot{width:14px;height:14px;border-radius:50%;flex:none;margin-top:14px;box-shadow:0 0 0 3px var(--bg),0 0 0 4.5px currentColor}
+.goal-node-line{width:2px;flex:1;min-height:22px;background:var(--border);margin:4px 0}
+.goal-box{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer}
+.goal-box-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.goal-obj-count{font-size:12px;color:var(--text-secondary)}
+.goal-checklist{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.goal-obj{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.goal-obj input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:var(--accent);cursor:pointer}
+.goal-obj span{font-size:14px}
+.goal-obj.done span{text-decoration:line-through;color:var(--text-secondary)}
+.menu-wrap{position:relative}
+.menu-btn{width:46px;height:46px;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:12px;padding:0;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu-btn:active{background:var(--surface-2)}
+.menu-btn[aria-expanded="true"]{background:var(--surface-2);border-color:var(--accent)}
+.menu-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:208px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:30}
+.menu-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);padding:10px 12px 6px}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;background:transparent;color:var(--text-primary);border:0;border-radius:10px;padding:12px 12px;font:inherit;font-size:15px;text-align:left;cursor:pointer}
+.menu-item:active{background:var(--surface-2)}
+.menu-item.active{background:var(--accent);color:var(--accent-contrast);font-weight:700}
+.menu-item.danger{color:var(--danger)}
+.menu-sep{height:1px;background:var(--border);margin:6px 6px}
+.upgrade-actions{display:flex;gap:8px;margin-top:10px}
+.upgrade-actions button{flex:1;padding:8px 0}
+.directive-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.directive-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;display:flex;justify-content:space-between;gap:8px}
+.score-row{display:flex;gap:14px;margin-top:10px}
+.score-col{flex:1;min-width:0}
+.score-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);margin-bottom:2px}
+.priority-num{font-size:12px;color:var(--text-secondary);margin-top:8px}
+.priority-num b{color:var(--text-primary)}
+.msg.pending{display:flex;flex-direction:column;gap:4px}
+.stream-wrap{display:grid}
+.stream-wrap>*{grid-area:1/1}
+.think-row{display:inline-flex;align-items:center;gap:8px;transition:opacity .25s ease}
+.think-row.fade-out{opacity:0}
+.think-label{font-size:13px;color:var(--text-secondary)}
+.think-dots{display:inline-flex;gap:5px;padding:4px 2px;align-items:center}
+.think-dot{font-size:16px;line-height:1;color:var(--text-secondary);animation:think-bounce 1.1s infinite ease-in-out}
+@keyframes think-bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+.stream-text{opacity:0;transition:opacity .25s ease;white-space:pre-wrap;word-wrap:break-word}
+.stream-text.show{opacity:1}
+.stream-cursor{display:inline-block;width:2px;height:1em;background:var(--text-secondary);vertical-align:text-bottom;margin-left:1px;animation:cursor-blink 1s step-start infinite}
+@keyframes cursor-blink{50%{opacity:0}}
+.interrupted-note{font-size:12px;color:var(--warning);font-style:italic;margin-top:2px}
+.pending-stop{align-self:flex-start;margin-top:2px}
+/* ===== Domain-scoped research: scoping prompt shown inline above the
+   composer when the user's message contains a URL, before any research
+   task instruction is composed. See DomainScopePrompt / Chat.send. ===== */
+.scope-card{margin:0 14px 8px}
+.scope-btns{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.scope-btns button{width:100%;text-align:left;white-space:normal;line-height:1.3;padding:10px 14px}
+.scope-btns button.chosen{outline:2px solid var(--accent);outline-offset:-2px}
+/* ===== Conversation history: bottom-sheet on narrow viewports, anchored
+   dropdown panel at/above the 700px breakpoint. Triggered by the header
+   clock icon; "New chat" archives the outgoing thread into this list
+   instead of discarding it. ===== */
+.history-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;animation:backdrop-in .18s ease}
+@keyframes backdrop-in{from{opacity:0}to{opacity:1}}
+.history-sheet{position:fixed;left:0;right:0;bottom:0;max-height:75dvh;background:var(--surface);border-top-left-radius:20px;border-top-right-radius:20px;box-shadow:0 -12px 40px rgba(0,0,0,.5);z-index:41;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);animation:sheet-up .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--border);margin:10px auto 2px;flex:none}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 6px;flex:none}
+.sheet-head h2{font-size:16px;margin:0}
+.sheet-body{overflow-y:auto;padding:4px 10px 14px}
+.conv-row{display:flex;align-items:center}
+.conv-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-radius:12px;padding:10px 10px;min-height:60px;color:var(--text-primary);font:inherit;cursor:pointer}
+.conv-item:active{background:var(--surface-2)}
+.conv-item .conv-main{flex:1;min-width:0}
+.conv-item .conv-title{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-item .conv-snippet{font-size:12.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv-item .conv-time{font-size:11.5px;color:var(--text-secondary);flex:none}
+.conv-del{width:44px;height:44px;flex:none;background:transparent;border:0;color:var(--text-secondary);font-size:16px;border-radius:10px;cursor:pointer;min-height:44px}
+.conv-del:active{background:var(--surface-2);color:var(--danger)}
+.sheet-empty{padding:24px 14px;color:var(--text-secondary);font-size:13.5px;text-align:center}
+@media (min-width:700px){
+  .history-sheet{left:auto;right:14px;bottom:auto;top:62px;width:340px;max-height:min(70dvh,520px);border-radius:16px;animation:panel-in .16s ease}
+  .sheet-handle{display:none}
+  .history-backdrop{background:rgba(0,0,0,.25)}
+}
+@keyframes panel-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+</style></head><body>
+<div id="root"></div>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import React from "https://esm.sh/react@18";
+import { createRoot } from "https://esm.sh/react-dom@18/client";
+const h = React.createElement;
+const SB_URL = "https://sphnmcjlxxzgovisgepo.supabase.co";
+const supabase = createClient(SB_URL, "sb_publishable_vVfIttSbf_XLWKl2xahBWA_-sXU34L0");
+const HISTORY_KEY = "alleah_chat_v1";
+const CONVERSATIONS_KEY = "alleah_conversations_v1"; // archived past threads, shown in the History bottom sheet
+const GOALS_KEY = "alleah_goals_v1";
+const THEME_KEY = "alleah_theme_v1";
+// ===== Theme (light / dark, WCAG AA token pass) =====
+// Tokens live in CSS (:root and [data-theme="light"]); this just flips the
+// attribute and persists the choice. Defaults to the user's OS preference,
+// falling back to dark (the app's original look) if that can't be read.
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {}
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+  } catch {}
+  return 'dark';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#f6f6f7' : '#121212');
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+}
+applyTheme(getInitialTheme());
+
+// ===== Keyboard-safe viewport height =====
+// Keeps --vvh (read by #root's height in CSS) in sync with the live visual
+// viewport so the composer - which sits in normal flex flow at the bottom
+// of #root - resizes up above the on-screen keyboard instead of being
+// covered by it. visualViewport reports the keyboard-aware height directly;
+// 100dvh (the CSS fallback) alone isn't enough on browsers that dispatch
+// resize events without changing dvh promptly, so we drive it from JS too.
+function installViewportHeightSync() {
+  function update() {
+    const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vvh', height + 'px');
+  }
+  update();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', update);
+    window.visualViewport.addEventListener('scroll', update);
+  }
+  window.addEventListener('orientationchange', update);
+}
+installViewportHeightSync();
+
+// ===== Domain-scoped research request handling =====
+// When Max's composer input contains a URL, the research-task instruction
+// that eventually gets queued (see ask-function.ts / QUEUE_TOOL) should be
+// scoped to that domain rather than left to free-text search, which can
+// wander onto unrelated namesakes or the wider open web. Detection + the
+// one-time scoping prompt live client-side in Chat (below); these are the
+// pure helpers that turn a chosen scope into the stricter instruction
+// skeleton the model is told to use verbatim when it composes the task.
+function detectUrl(text) {
+  const m = String(text || '').match(/https?:\/\/[^\s]+/i);
+  if (!m) return null;
+  return m[0].replace(/[),.;:!?\]"']+$/, ''); // trim trailing sentence punctuation
+}
+function getDomain(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./i, '').toLowerCase();
+  } catch { return null; }
+}
+// No network access here (and no DB of known subdomains) - offer the
+// common host prefixes as a starting scope and tell the worker in the
+// instruction itself to add any further <domain> subdomains it discovers.
+function guessSubdomains(domain, limit) {
+  const common = ['www', 'blog', 'docs', 'help', 'support', 'app', 'status', 'shop', 'careers'];
+  return common.slice(0, limit || 5).map(s => s + '.' + domain);
+}
+function buildDomainScopedInstruction(mode, domain, rawAsk) {
+  const subs = guessSubdomains(domain, 5);
+  const subsSiteList = subs.map(s => 'site:' + s).join(', ');
+  const title = mode === 'follow'
+    ? 'Domain-scoped research \u2014 site + its own outbound links'
+    : 'Domain-scoped research \u2014 single site only';
+  const lines = [];
+  lines.push('Restrict every search query to `site:' + domain + '` (plus its subdomains: ' + subsSiteList +
+    ', and any further ' + domain + ' subdomains you discover while working). Never search on the bare ' +
+    'company/entity name alone - that pulls in unrelated namesakes and off-domain noise that are out of scope here.');
+  if (mode === 'follow') {
+    lines.push('Outbound links found ON ' + domain + '\u2019s own pages (a press mention it links to, a partner site, ' +
+      'its official social profiles, etc.) may be opened for corroborating context. Only follow links actually ' +
+      'discovered on a ' + domain + ' page - never run a separate open-web search on the company name to go find ' +
+      'those yourself.');
+  } else {
+    lines.push('Stay inside ' + domain + ' and its subdomains for the whole task. Do not follow outbound links to ' +
+      'other domains even if ' + domain + ' itself links to them.');
+  }
+  lines.push('Before searching, check `' + domain + '/sitemap.xml`. If it exists, treat it as the primary page ' +
+    'inventory: fetch it, enumerate the URLs it lists, and use that list to decide what to open - rather than ' +
+    'leaning on free-text search to discover pages. If it does not exist (404 or blocked), fall back to ' +
+    '`site:' + domain + '` search plus normal in-site navigation from the homepage.');
+  lines.push('Deliverable: ' + rawAsk);
+  return title + '\n\n' + lines.map(l => '- ' + l).join('\n');
+}
+// Appended only to the copy of the turn sent to the ask function (never to
+// what's rendered in the thread) so the model sees the binding scope
+// directive without Max's own bubble getting cluttered with instructions.
+function domainScopeDirectiveText(ds) {
+  return 'DOMAIN SCOPE DIRECTIVE \u2014 if/when this becomes a queued research task, use this instruction skeleton ' +
+    'verbatim (only filling in extra detail Max already gave in this message):\n' + ds.instruction;
+}
+// ===== Header menu =====
+// Single source of truth for the view links shown in the header menu.
+// To add a new tab later, just append {key, label} here - the menu and
+// the active-view highlight both key off this list automatically.
+const VIEWS = [
+  {key:'chat', label:'Chat'},
+  {key:'tasks', label:'Tasks'},
+  {key:'goals', label:'Goals'},
+  {key:'upgrades', label:'Upgrades'},
+];
+
+function HeaderMenu(props) {
+  const [open, setOpen] = React.useState(false);
+  const [theme, setTheme] = React.useState(() => document.documentElement.getAttribute('data-theme') || 'dark');
+  const wrapRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    function onDocDown(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
+    function onKeyDown(e) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+  function toggleTheme() {
+    const next = theme === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    setTheme(next);
+  }
+  return h('div', {className:'menu-wrap', ref:wrapRef},
+    h('button', {
+      type:'button', className:'menu-btn', 'aria-haspopup':'menu', 'aria-expanded':open,
+      'aria-label': open ? 'Close menu' : 'Open menu',
+      onClick:() => setOpen(o => !o),
+    }, '☰'),
+    open ? h('div', {className:'menu-dropdown', role:'menu'},
+      h('div', {className:'menu-label'}, 'View'),
+      VIEWS.map(v => h('button', {
+        key:v.key, type:'button', role:'menuitem',
+        className:'menu-item' + (props.view === v.key ? ' active' : ''),
+        'aria-current': props.view === v.key ? 'page' : undefined,
+        onClick:() => { props.setView(v.key); setOpen(false); },
+      }, v.label)),
+      h('div', {className:'menu-sep'}),
+      h('button', {
+        type:'button', role:'menuitem', className:'menu-item',
+        onClick:toggleTheme,
+      }, (theme === 'light' ? '🌙 ' : '☀️ ') + (theme === 'light' ? 'Dark theme' : 'Light theme')),
+      h('button', {
+        type:'button', role:'menuitem', className:'menu-item',
+        onClick:() => { setOpen(false); props.onNewChat(); },
+      }, 'New chat'),
+      h('button', {
+        type:'button', role:'menuitem', className:'menu-item danger',
+        onClick:() => { setOpen(false); props.onSignOut(); },
+      }, 'Sign out')
+    ) : null);
+}
+
+// ===== Conversation history: bottom-sheet (narrow) / dropdown panel (wide) =====
+// Archived conversations (written by Chat's onNewChat / openConversation
+// below) are plain localStorage records - no new table, following the same
+// client-side-only pattern already used for GOALS_KEY. Kept intentionally
+// separate from HISTORY_KEY (the live thread) so switching conversations
+// can never silently merge or lose messages.
+function fmtRelTime(ts) {
+  const diff = Date.now() - ts;
+  const MIN = 60000, HOUR = 3600000, DAY = 86400000;
+  if (diff < HOUR) return Math.max(1, Math.round(diff / MIN)) + 'm ago';
+  if (diff < DAY) return Math.round(diff / HOUR) + 'h ago';
+  return Math.round(diff / DAY) + 'd ago';
+}
+function HistorySheet(props) {
+  React.useEffect(() => {
+    function onKeyDown(e) { if (e.key === 'Escape') props.onClose(); }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+  return h(React.Fragment, null,
+    h('div', {className:'history-backdrop', onClick:props.onClose}),
+    h('div', {className:'history-sheet', role:'dialog', 'aria-modal':'true', 'aria-label':'Conversation history'},
+      h('div', {className:'sheet-handle'}),
+      h('div', {className:'sheet-head'},
+        h('h2', null, 'History'),
+        h('button', {type:'button', className:'menu-btn', style:{width:'40px',height:'40px',fontSize:'16px'}, 'aria-label':'Close history', onClick:props.onClose}, '✕')),
+      h('div', {className:'sheet-body'},
+        props.conversations.length === 0
+          ? h('p', {className:'sheet-empty'}, 'Conversations you start fresh from ("New chat") are saved here, so nothing is lost.')
+          : props.conversations.map(c => h('div', {className:'conv-row', key:c.id},
+              h('button', {type:'button', className:'conv-item', onClick:() => props.onOpen(c)},
+                h('span', {className:'conv-main'},
+                  h('div', {className:'conv-title'}, c.title),
+                  h('div', {className:'conv-snippet'}, c.snippet)),
+                h('span', {className:'conv-time'}, fmtRelTime(c.ts))),
+              h('button', {type:'button', className:'conv-del', 'aria-label':'Delete conversation', onClick:() => props.onDelete(c.id)}, '🗑'))))));
+}
+
+function Auth() {
+  const [email, setEmail] = React.useState('');
+  const [pw, setPw] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  async function go(mode) {
+    setBusy(true); setMsg('');
+    const res = mode === 'up'
+      ? await supabase.auth.signUp({email, password: pw})
+      : await supabase.auth.signInWithPassword({email, password: pw});
+    setBusy(false);
+    if (res.error) setMsg(res.error.message);
+    else if (mode === 'up' && !res.data.session) setMsg('Check your email to confirm, then sign in.');
+  }
+  return h('div', {className:'auth'},
+    h('h1', null, 'Alleah'),
+    h('div', {style:{height:'12px'}}),
+    h('input', {placeholder:'email', type:'email', value:email, onChange:e=>setEmail(e.target.value)}),
+    h('div', {style:{height:'8px'}}),
+    h('input', {placeholder:'password', type:'password', value:pw, onChange:e=>setPw(e.target.value)}),
+    h('div', {className:'row'},
+      h('button', {disabled:busy, onClick:()=>go('in')}, 'Sign in'),
+      h('button', {className:'secondary', disabled:busy, onClick:()=>go('up')}, 'Sign up')),
+    msg ? h('p', {className:'muted'}, msg) : null);
+}
+
+// ===== Calibrated thinking/streaming indicator =====
+// Tuning knobs for the "thinking" -> stream cross-fade -> done lifecycle.
+// MIN_THINK_MS: the three-dot state is held at least this long even when the
+// backend answers instantly, so it never flashes for <300ms nor feels abrupt.
+const MIN_THINK_MS = 400; // within the calibrated 300-500ms band
+const CROSSFADE_MS = 250; // dots-to-text cross-fade duration, mirrors the CSS transition
+const REVEAL_CHARS_PER_TICK = 3;
+const REVEAL_TICK_MS = 16; // ~60fps token-by-token reveal
+
+// Renders a message's sender + timestamp line above its bubble. Timestamps
+// are optional (older history saved before this feature won't have `ts`),
+// in which case just the sender name shows.
+function formatMsgTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  } catch { return ''; }
+}
+function MsgRowMeta(props) {
+  return h('div', {className:'msg-row-meta'},
+    h('span', {className:'msg-row-name'}, props.role === 'user' ? 'You' : 'Alleah'),
+    props.ts ? h('span', {className:'msg-row-time'}, formatMsgTime(props.ts)) : null);
+}
+
+// Text ("Thinking" + literal dot characters), not just a CSS animation on empty
+// nodes - so the indicator is detectable by reading rendered text/accessible
+// name, not only by pixel inspection. role=status announces the state change.
+function ThinkingDots(props) {
+  return h('div', {className:'think-row' + (props.fading ? ' fade-out' : ''), role:'status', 'aria-live':'polite', 'aria-label':'Alleah is thinking'},
+    h('span', {className:'think-label'}, 'Thinking'),
+    h('span', {className:'think-dots'},
+      h('span', {className:'think-dot', style:{animationDelay:'0s'}}, '\u2022'),
+      h('span', {className:'think-dot', style:{animationDelay:'.15s'}}, '\u2022'),
+      h('span', {className:'think-dot', style:{animationDelay:'.3s'}}, '\u2022')));
+}
+
+// Renders the single in-flight assistant turn through every phase:
+// thinking (dots) -> crossfade (dots fading out over incoming text) ->
+// streaming (token-by-token text) -> interrupted (Stop was clicked).
+// Wrapped in the same .msg-row container as finalized turns so padding
+// and sender/meta placement stay consistent while a reply is still in flight.
+function PendingBubble(props) {
+  const p = props.p;
+  if (p.phase === 'interrupted') {
+    const hasPartial = !!(p.revealed && p.revealed.length);
+    return h('div', {className:'msg-row assistant'},
+      h(MsgRowMeta, {role:'assistant'}),
+      h('div', {className:'msg assistant pending', 'data-phase':p.phase},
+        hasPartial ? h('span', null, p.revealed) : null,
+        h('div', {className:'interrupted-note'}, (hasPartial ? '⏸ ' : '⏹ ') + (hasPartial ? 'Generation stopped.' : 'Stopped before generating a response.')),
+        h('div', {className:'upgrade-actions'},
+          hasPartial ? h('button', {type:'button', className:'secondary', onClick:props.onContinue}, 'Continue') : null,
+          h('button', {type:'button', className:'secondary', onClick:props.onRegenerate}, 'Regenerate'))));
+  }
+  const showDots = p.phase === 'thinking' || p.phase === 'crossfade';
+  const showText = p.phase === 'crossfade' || p.phase === 'streaming';
+  return h('div', {className:'msg-row assistant'},
+    h(MsgRowMeta, {role:'assistant'}),
+    h('div', {className:'msg assistant pending', 'data-phase':p.phase},
+      h('div', {className:'stream-wrap'},
+        showDots ? h(ThinkingDots, {fading: p.phase === 'crossfade'}) : null,
+        showText ? h('span', {className:'stream-text show'},
+          p.revealed, h('span', {className:'stream-cursor'})) : null)));
+}
+
+// ===== Domain-scoped research: one-time scoping prompt =====
+// Rendered inline above the composer whenever Chat.send() detects a URL in
+// the pending message and holds it for scoping. `ds.stage` is 'prompt'
+// (choose a scope) or 'review' (scope chosen - generated instruction shown
+// for review before it's actually sent). Once a choice is made the two
+// scope buttons lock (the "one-time" prompt); "Change" reopens them.
+function DomainScopePrompt(props) {
+  const ds = props.ds;
+  return h('div', {className:'card scope-card', role:'group', 'aria-label':'Scope this research request'},
+    h('p', {className:'small', style:{margin:'0 0 2px', color:'var(--text-primary)'}},
+      '🔗 ', h('b', null, ds.domain), ' was found in that message.'),
+    h('p', {className:'small', style:{margin:'0 0 4px'}}, 'Scope the research before it\u2019s sent:'),
+    h('div', {className:'scope-btns'},
+      h('button', {
+        type:'button', disabled: ds.stage === 'review',
+        className:'secondary' + (ds.mode === 'strict' ? ' chosen' : ''),
+        onClick:() => props.onChoose('strict'),
+      }, 'Just this domain (and its subdomains)'),
+      h('button', {
+        type:'button', disabled: ds.stage === 'review',
+        className:'secondary' + (ds.mode === 'follow' ? ' chosen' : ''),
+        onClick:() => props.onChoose('follow'),
+      }, 'Also follow links it references out to other sites.')),
+    ds.stage === 'review' ? h('div', {style:{marginTop:'10px'}},
+      h('p', {className:'small', style:{margin:'0 0 4px'}}, 'Generated research task instruction (for review):'),
+      h('pre', {className:'task-full'}, ds.instruction),
+      h('div', {className:'row', style:{marginTop:'8px'}},
+        h('button', {type:'button', onClick:props.onConfirm}, 'Send with this scope'),
+        h('button', {type:'button', className:'secondary', onClick:props.onChangeScope}, 'Change'),
+        h('button', {type:'button', className:'secondary', onClick:props.onCancel}, 'Cancel')))
+      : h('div', {style:{marginTop:'8px'}},
+        h('button', {type:'button', className:'secondary', onClick:props.onCancel}, 'Cancel')));
+}
+
+function loadConversations() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CONVERSATIONS_KEY));
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
+}
+
+function Chat(props) {
+  const [messages, setMessages] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
+  });
+  const [conversations, setConversations] = React.useState(loadConversations);
+  const [text, setText] = React.useState('');
+  const [pending, setPending] = React.useState(null); // {phase, revealed, fullAnswer, folders}
+  const [err, setErr] = React.useState('');
+  const [view, setView] = React.useState('chat');
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [autoScroll, setAutoScroll] = React.useState(true); // false once the user manually scrolled away from the bottom
+  const [newCount, setNewCount] = React.useState(0); // messages arrived while autoScroll is paused
+  const [attachNote, setAttachNote] = React.useState('');
+  // Domain-scoped research: {stage:'prompt'|'review', msgText, url, domain, mode, instruction}
+  // or null. Set by send() when it detects a URL in the pending message and
+  // holds it for scoping instead of sending immediately.
+  const [domainScope, setDomainScope] = React.useState(null);
+  const threadRef = React.useRef(null);
+  const endRef = React.useRef(null);
+  const taRef = React.useRef(null);
+  const prevLenRef = React.useRef(messages.length);
+  const pendingRef = React.useRef(null);
+  const abortRef = React.useRef(null);
+  const revealTimerRef = React.useRef(null);
+  const guardTimerRef = React.useRef(null);
+  const crossfadeTimerRef = React.useRef(null);
+  const lastTurnsRef = React.useRef(null);
+  const generating = !!pending && pending.phase !== 'interrupted';
+
+  React.useEffect(() => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-60)));
+    if (autoScroll) {
+      endRef.current && endRef.current.scrollIntoView({behavior:'smooth'});
+      if (messages.length !== prevLenRef.current) setNewCount(0);
+    } else if (messages.length > prevLenRef.current) {
+      setNewCount(c => c + (messages.length - prevLenRef.current));
+    }
+    prevLenRef.current = messages.length;
+  }, [messages, pending, autoScroll]);
+
+  React.useEffect(() => {
+    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations.slice(0, 50)));
+  }, [conversations]);
+
+  // Auto-grow the composer textarea; the actual on-screen cap is CSS
+  // (max-height: min(40dvh, 320px)) so it can never grow past the visible,
+  // keyboard-safe area no matter what height we compute here.
+  React.useLayoutEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [text]);
+
+  React.useEffect(() => () => {
+    clearTimers();
+    if (abortRef.current) abortRef.current.abort();
+  }, []);
+
+  function updatePending(patch) {
+    pendingRef.current = pendingRef.current ? {...pendingRef.current, ...patch} : patch;
+    setPending(pendingRef.current);
+  }
+
+  function clearTimers() {
+    if (revealTimerRef.current) { clearInterval(revealTimerRef.current); revealTimerRef.current = null; }
+    if (guardTimerRef.current) { clearTimeout(guardTimerRef.current); guardTimerRef.current = null; }
+    if (crossfadeTimerRef.current) { clearTimeout(crossfadeTimerRef.current); crossfadeTimerRef.current = null; }
+  }
+
+  // Manual scroll detection: once the user scrolls more than ~1 message away
+  // from the bottom, auto-scroll-to-bottom is suspended so an in-progress
+  // reply doesn't yank them back down. Returning within the threshold (or
+  // tapping "jump to latest") resumes it.
+  function handleThreadScroll() {
+    const el = threadRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 96;
+    setAutoScroll(nearBottom);
+    if (nearBottom) setNewCount(0);
+  }
+
+  function jumpToLatest() {
+    setAutoScroll(true);
+    setNewCount(0);
+    endRef.current && endRef.current.scrollIntoView({behavior:'smooth'});
+  }
+
+  function startReveal() {
+    if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+    revealTimerRef.current = setInterval(() => {
+      const p = pendingRef.current;
+      if (!p || p.fullAnswer == null) return;
+      const nextLen = Math.min((p.revealed || '').length + REVEAL_CHARS_PER_TICK, p.fullAnswer.length);
+      const revealed = p.fullAnswer.slice(0, nextLen);
+      if (nextLen >= p.fullAnswer.length) {
+        clearInterval(revealTimerRef.current); revealTimerRef.current = null;
+        updatePending({revealed, phase:'streaming'});
+        finalizeMessage();
+      } else {
+        updatePending({revealed});
+      }
+    }, REVEAL_TICK_MS);
+  }
+
+  function finalizeMessage() {
+    const p = pendingRef.current;
+    if (!p) return;
+    setMessages(m => [...m, {role:'assistant', content: p.fullAnswer, folders: p.folders || [], ts: Date.now()}]);
+    pendingRef.current = null; setPending(null);
+  }
+
+  async function runSend(turns) {
+    setErr('');
+    lastTurnsRef.current = turns;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const start = Date.now();
+    pendingRef.current = {phase:'thinking', revealed:'', fullAnswer:null, folders:[]};
+    setPending(pendingRef.current);
+
+    let answerData = null, fetchErrMsg = null, aborted = false;
+    try {
+      const res = await fetch(SB_URL + '/functions/v1/ask', {
+        method:'POST',
+        headers:{'content-type':'application/json','authorization':'Bearer ' + props.session.access_token},
+        signal: controller.signal,
+        // A turn carrying `domainScope` (set below, once Max resolves the
+        // scoping prompt) gets its binding scope directive appended for the
+        // MODEL's copy of the message only - the bubble rendered in the
+        // thread stays as the clean text Max actually typed.
+        body: JSON.stringify({messages: turns.slice(-10).map(m => ({
+          role: m.role,
+          content: m.domainScope ? (m.content + '\n\n' + domainScopeDirectiveText(m.domainScope)) : m.content,
+        }))})
+      });
+      answerData = await res.json();
+    } catch (e) {
+      if (e && e.name === 'AbortError') aborted = true; else fetchErrMsg = String(e);
+    }
+
+    // User already stopped generation while the request was in flight.
+    if (!pendingRef.current || pendingRef.current.phase === 'interrupted') return;
+    if (aborted) return; // stop() already moved state to interrupted
+
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, MIN_THINK_MS - elapsed);
+    guardTimerRef.current = setTimeout(() => {
+      if (!pendingRef.current || pendingRef.current.phase === 'interrupted') return;
+      if (fetchErrMsg) {
+        setErr('Error: ' + fetchErrMsg);
+        pendingRef.current = null; setPending(null);
+        return;
+      }
+      if (answerData && answerData.error) {
+        setErr('Error: ' + answerData.error);
+        pendingRef.current = null; setPending(null);
+        return;
+      }
+      updatePending({phase:'crossfade', fullAnswer: (answerData && answerData.answer) || '', folders: (answerData && answerData.folders) || []});
+      startReveal();
+      crossfadeTimerRef.current = setTimeout(() => {
+        if (pendingRef.current && pendingRef.current.phase === 'crossfade') updatePending({phase:'streaming'});
+      }, CROSSFADE_MS);
+    }, remaining);
+  }
+
+  // Opens the one-time domain scoping prompt for `content` if it contains a
+  // URL, holding the message (composer clears, nothing is sent yet) until
+  // Max picks a scope. Returns true when it did so - callers should stop.
+  function maybeOpenDomainScope(content) {
+    const url = detectUrl(content);
+    const domain = url ? getDomain(url) : null;
+    if (!domain) return false;
+    setText('');
+    setDomainScope({stage:'prompt', msgText: content, url, domain});
+    return true;
+  }
+
+  function chooseDomainScope(mode) {
+    setDomainScope(ds => {
+      if (!ds) return ds;
+      const instruction = buildDomainScopedInstruction(mode, ds.domain, ds.msgText);
+      return {...ds, stage:'review', mode, instruction};
+    });
+  }
+
+  function changeDomainScope() {
+    setDomainScope(ds => ds ? {stage:'prompt', msgText: ds.msgText, url: ds.url, domain: ds.domain} : ds);
+  }
+
+  function cancelDomainScope() {
+    setDomainScope(ds => {
+      if (ds) setText(ds.msgText); // give the message back to the composer, untouched
+      return null;
+    });
+  }
+
+  // Fires once Max reviews the generated instruction and accepts it: the
+  // held message finally enters the thread, tagged with the resolved scope
+  // so runSend can attach the directive and the thread can show a chip.
+  async function confirmDomainScopedSend() {
+    const ds = domainScope;
+    if (!ds || ds.stage !== 'review') return;
+    setAutoScroll(true); setNewCount(0);
+    if (pendingRef.current) { pendingRef.current = null; setPending(null); }
+    const userTurn = {
+      role:'user', content: ds.msgText, ts: Date.now(),
+      domainScope: {mode: ds.mode, domain: ds.domain, instruction: ds.instruction},
+    };
+    setDomainScope(null);
+    const next = [...messages, userTurn];
+    setMessages(next);
+    await runSend(next);
+  }
+
+  async function send() {
+    const content = text.trim();
+    if (!content || generating || domainScope) return;
+    if (maybeOpenDomainScope(content)) return; // scoping prompt takes over; send() re-runs via confirmDomainScopedSend
+    setText('');
+    setAutoScroll(true); // sending re-engages auto-follow even if the user had scrolled up
+    setNewCount(0);
+    // Drop any leftover interrupted bubble from a prior turn before starting a new one.
+    if (pendingRef.current) { pendingRef.current = null; setPending(null); }
+    const next = [...messages, {role:'user', content, ts: Date.now()}];
+    setMessages(next);
+    await runSend(next);
+  }
+
+  function stop() {
+    clearTimers();
+    if (abortRef.current) abortRef.current.abort();
+    if (!pendingRef.current) return;
+    updatePending({phase:'interrupted'});
+  }
+
+  function continueGen() {
+    const p = pendingRef.current;
+    if (!p || p.fullAnswer == null) return;
+    updatePending({phase:'streaming'});
+    startReveal();
+  }
+
+  function regenerate() {
+    clearTimers();
+    pendingRef.current = null; setPending(null);
+    const turns = lastTurnsRef.current || messages;
+    runSend(turns);
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  function onAttach() {
+    setAttachNote('Attachments aren\u2019t supported yet.');
+    setTimeout(() => setAttachNote(''), 2200);
+  }
+
+  // Turns the live thread into a History entry. Used both by "New chat"
+  // (archive-then-clear) and by opening a different past conversation
+  // (archive-then-swap), so neither path can silently drop messages.
+  function archiveCurrentIfAny() {
+    if (!messages.length) return null;
+    const firstUser = messages.find(m => m.role === 'user');
+    const assistants = messages.filter(m => m.role === 'assistant');
+    const lastAssistant = assistants.length ? assistants[assistants.length - 1] : null;
+    return {
+      id: 'c' + Date.now().toString(36),
+      title: firstUser ? firstUser.content.slice(0, 48) : 'Conversation',
+      snippet: lastAssistant ? lastAssistant.content.slice(0, 80) : '',
+      ts: Date.now(),
+      messages,
+    };
+  }
+
+  function newChat() {
+    if (messages.length && !confirm('Start a new chat? This conversation will be saved to History. (Your memory folders are not affected.)')) return;
+    const archived = archiveCurrentIfAny();
+    if (archived) setConversations(cs => [archived, ...cs]);
+    clearTimers();
+    if (abortRef.current) abortRef.current.abort();
+    pendingRef.current = null; setPending(null);
+    setMessages([]);
+    setDomainScope(null);
+    setAutoScroll(true); setNewCount(0);
+  }
+
+  function openConversation(c) {
+    const archived = archiveCurrentIfAny();
+    setConversations(cs => {
+      const rest = cs.filter(x => x.id !== c.id);
+      return archived ? [archived, ...rest] : rest;
+    });
+    clearTimers();
+    if (abortRef.current) abortRef.current.abort();
+    pendingRef.current = null; setPending(null);
+    setMessages(c.messages);
+    setDomainScope(null);
+    setHistoryOpen(false);
+    setAutoScroll(true); setNewCount(0);
+  }
+
+  function deleteConversation(id) {
+    setConversations(cs => cs.filter(c => c.id !== id));
+  }
+
+  return h(React.Fragment, null,
+    h('header', null,
+      h('h1', null, 'Alleah'),
+      h('div', {className:'header-actions'},
+        h('button', {
+          type:'button', className:'menu-btn',
+          'aria-label': 'Conversation history' + (conversations.length ? ' (' + conversations.length + ')' : ''),
+          onClick:() => setHistoryOpen(true),
+        }, '🕘'),
+        h(HeaderMenu, {
+          view, setView,
+          onNewChat: newChat,
+          onSignOut: () => supabase.auth.signOut(),
+        }))),
+    view === 'tasks' ? h(Tasks, {session: props.session})
+    : view === 'goals' ? h(Goals, null)
+    : view === 'upgrades' ? h(Upgrades, {session: props.session})
+    : h(React.Fragment, null,
+    h('div', {className:'thread-wrap'},
+      h('div', {id:'thread', ref:threadRef, onScroll:handleThreadScroll},
+        messages.length === 0 ? h('p', {className:'muted', style:{padding:'0 6px'}}, 'Talk to me. What you tell me about what you know gets remembered - automatically.') : null,
+        messages.map((m, i) =>
+          h(React.Fragment, {key:i},
+          h('div', {className:'msg-row ' + m.role},
+            h(MsgRowMeta, {role:m.role, ts:m.ts}),
+            h('div', {className:'msg ' + m.role}, m.content)),
+          m.domainScope
+            ? h('div', {className:'cites'}, '🔎 scoped to ' + m.domainScope.domain + (m.domainScope.mode === 'follow' ? ' + its own outbound links' : ' only'))
+            : null,
+          m.folders && m.folders.length
+            ? h('div', {className:'cites'}, 'memory: ' + m.folders.map(f => '[' + f.n + '] ' + f.title).join('  '))
+            : null)),
+        pending ? h(PendingBubble, {p: pending, onContinue: continueGen, onRegenerate: regenerate}) : null,
+        h('div', {ref:endRef})),
+      !autoScroll ? h('button', {type:'button', className:'jump-latest-btn', onClick:jumpToLatest},
+        '↓ Jump to latest', newCount ? h('span', {className:'badge-count'}, newCount) : null) : null),
+    err ? h('p', {className:'err'}, '⚠ ' + err) : null,
+    domainScope ? h(DomainScopePrompt, {
+      ds: domainScope,
+      onChoose: chooseDomainScope,
+      onChangeScope: changeDomainScope,
+      onCancel: cancelDomainScope,
+      onConfirm: confirmDomainScopedSend,
+    }) : null,
+    h('div', {className:'composer'},
+      attachNote ? h('div', {className:'attach-note'}, attachNote) : null,
+      h('button', {type:'button', className:'attach-btn', 'aria-label':'Attach file', onClick:onAttach, disabled:!!domainScope}, '📎'),
+      h('textarea', {ref:taRef, placeholder:'Message Alleah...', value:text, rows:1, disabled:!!domainScope, onChange:e=>setText(e.target.value), onKeyDown:onKey}),
+      generating
+        ? h('button', {type:'button', className:'stop-btn', onClick:stop}, 'Stop')
+        : h('button', {disabled:!text.trim() || !!domainScope, onClick:send}, 'Send'))),
+    historyOpen ? h(HistorySheet, {
+      conversations, onClose:() => setHistoryOpen(false),
+      onOpen:openConversation, onDelete:deleteConversation,
+    }) : null);
+}
+
+// ===== Task tray =====
+// Three meters visualize BUDGET CONSUMED (steps / spend / time) - deliberately no
+// percent-complete bar anywhere: completion isn't knowable.
+// Status is never color-only: each entry pairs a token color with a distinct
+// glyph AND the status word itself, so it still reads correctly for color-blind
+// users, in grayscale printouts, and to screen readers (the glyph is decorative
+// via aria-hidden, the text label carries the accessible name).
+const STATUS_META = {
+  queued:    {color:'var(--text-secondary)', icon:'🕓'},
+  running:   {color:'var(--accent)',         icon:'▶'},
+  done:      {color:'var(--accent)',         icon:'✓'},
+  capped:    {color:'var(--warning)',        icon:'▲'},
+  failed:    {color:'var(--danger)',         icon:'✕'},
+  cancelled: {color:'var(--neutral)',        icon:'⦸'},
+};
+
+function fmtAge(iso) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  if (m < 1440) return Math.floor(m/60) + 'h ago';
+  return Math.floor(m/1440) + 'd ago';
+}
+
+function StatusBadge(props) {
+  const meta = STATUS_META[props.status] || {color:'var(--text-secondary)', icon:'•'};
+  return h('span', {className:'badge'},
+    h('span', {className:'dot' + (props.pulse ? ' pulse' : ''), style:{background:meta.color}}),
+    h('span', {className:'status-icon', 'aria-hidden':'true', style:{color:meta.color}}, meta.icon),
+    h('span', {style:{color:meta.color}}, props.label));
+}
+
+function TaskCard(props) {
+  const t = props.t;
+  const [open, setOpen] = React.useState(false);
+  const active = t.status === 'queued' || t.status === 'running';
+  // Kind-aware budget caps: build/revision run on the larger build budget.
+  const CAP = (t.kind === 'build' || t.kind === 'revision')
+    ? {steps: 50, spend: 2.00, min: 30}
+    : {steps: 25, spend: 0.50, min: 15};
+  const steps = Math.min(t.steps_used || 0, CAP.steps);
+  const spend = Math.min(Number(t.spend_usd) || 0, CAP.spend);
+  const spendRatio = spend / CAP.spend;
+  const endMs = t.completed_at ? new Date(t.completed_at).getTime() : Date.now();
+  const elapsedMs = Math.max(0, Math.min(endMs - new Date(t.created_at).getTime(), CAP.min*60000));
+  const elapsed = Math.floor(elapsedMs/60000) + 'm ' + Math.floor((elapsedMs%60000)/1000) + 's';
+  const spendColor = spendRatio < 0.5 ? 'var(--accent)' : spendRatio < 0.8 ? 'var(--warning)' : 'var(--danger)';
+  const meta = STATUS_META[t.status] || {color:'var(--text-secondary)', icon:'•'};
+  const pv = props.preview;
+  const rvw = props.review;
+  const sha = rvw ? (/audited staged commit: ([0-9a-f]{7,40})/i.exec(rvw) || [])[1] : null;
+  // Clean verdict needs POSITIVE evidence: an audited SHA plus an explicit no-findings
+  // marker, and no findings SECTION. A findings section is an anchored "Findings:" line
+  // not immediately saying none/0 - so "no findings in the CSS" elsewhere can't cancel
+  // a real findings list. Ambiguity defaults to "ask Alleah" - never green.
+  const saysClean = rvw ? /\bno findings\b|\b0 findings\b|\bverdict:\s*clean\b|\bfindings:\s*(none|0)\b/i.test(rvw) : false;
+  const hasFindings = rvw ? /^\s*findings\s*:(?!\s*(none|0)\b)/mi.test(rvw) : false;
+  const clean = !!sha && saysClean && !hasFindings;
+  const safeUrl = pv && typeof pv.preview_url === 'string' && /^https:\/\//.test(pv.preview_url);
+  return h('div', {className:'card'},
+    h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}},
+      h(StatusBadge, {status:t.status, pulse:t.status==='running', label:(t.kind && t.kind !== 'research' ? t.kind + ' · ' : '') + t.status}),
+      h('span', {className:'small'}, fmtAge(t.created_at)),
+      active ? h('button', {className:'secondary', style:{marginTop:0,padding:'4px 10px',fontSize:'12px'},
+        onClick:function(){ if(confirm('Cancel this task?')) props.onCancel(t.id); }}, 'Cancel') : null),
+    pv && !(pv.status === 'expired' && !safeUrl) ? h('p', {className:'small', style:{margin:'6px 0 0'}},
+      safeUrl ? h('a', {href: pv.preview_url, target:'_blank', rel:'noopener'}, 'Preview ↗')
+              : h('span', {style:{color:'var(--text-secondary)'}}, pv.status === 'building' ? 'preview building…' : 'preview url missing'),
+      '  rev ' + pv.revision + ' · ' + pv.status,
+      rvw ? (clean
+        ? h('span', null, '  ·  review: clean ✓  ',
+            h('a', {href:'https://github.com/maxrym-svg/alleah/actions/workflows/promote-preview.yml', target:'_blank', rel:'noopener'}, 'Promote ↗'),
+            '  sha ' + sha.slice(0,12) + '…')
+        : hasFindings
+          ? h('span', {style:{color:'var(--warning)'}}, '  ·  ▲ review: findings - ask Alleah')
+          : h('span', {style:{color:'var(--text-secondary)'}}, '  ·  review done - ask Alleah for the verdict')) : null) : null,
+    h('p', {style:{margin:'8px 0 4px',cursor:'pointer'}, onClick:function(){setOpen(!open)}},
+      (function(){
+        const label = t.kind === 'review'
+          ? 'audit of build ' + (t.instruction || '').trim().slice(0, 8)
+          : (t.instruction || '');
+        return open ? label : (label.length > 110 ? label.slice(0,110) + '...' : label);
+      })()),
+    t.status === 'running' && t.progress ? h('p', {className:'small', style:{color:'var(--text-primary)'}}, '▸ ' + t.progress) : null,
+    active ? h('div', null,
+      h('div', {className:'small'}, 'steps used: ' + steps + ' / ' + CAP.steps),
+      h('div', {className:'segbar'}, Array.from({length: CAP.steps}, function(_, i){
+        return h('span', {key:i, className:'seg' + (i < steps ? ' on' : '')}); })),
+      h('div', {className:'small'}, 'spend: $' + spend.toFixed(2) + ' / $' + CAP.spend.toFixed(2) + ' cap'),
+      h('div', {className:'meter'}, h('div', {style:{width:(spendRatio*100)+'%',background:spendColor}})),
+      h('div', {className:'small'}, 'time since queued: ' + elapsed + ' / ' + CAP.min + 'm limit (worker may start up to 1m after queuing)'),
+      h('div', {className:'meter'}, h('div', {style:{width:(elapsedMs/(CAP.min*60000)*100)+'%',background:'var(--accent-muted-dark)'}}))) : null,
+    open ? h('div', null,
+      t.result ? h('div', {className:'task-full'}, t.result) : null,
+      t.error ? h('p', {className:'err', style:{padding:0}}, '⚠ ' + t.error) : null,
+      h('p', {className:'small'}, 'steps ' + (t.steps_used ?? 0) + ' · $' + (Number(t.spend_usd)||0).toFixed(2) +
+        ' · queued ' + new Date(t.created_at).toLocaleString() +
+        (t.completed_at ? ' · finished ' + new Date(t.completed_at).toLocaleString() : ''))) : null);
+}
+
+function Tasks(props) {
+  const [tasks, setTasks] = React.useState([]);
+  const [previews, setPreviews] = React.useState({});
+  const [reviews, setReviews] = React.useState({});
+  const [msg, setMsg] = React.useState('loading...');
+  async function load() {
+    const r = await supabase.from('worker_tasks').select('*').order('created_at', {ascending:false}).limit(50);
+    if (r.error) { setMsg('Error: ' + r.error.message); return; }
+    setTasks(r.data);
+    setMsg(r.data.length ? '' : 'No tasks yet. Say "Alleah, start a task" in chat.');
+    // latest done review per build task (review instruction = build task id)
+    const rv = {};
+    r.data.filter(function(t){ return t.kind === 'review' && t.status === 'done' && t.result; })
+      .forEach(function(t){ const key = (t.instruction || '').trim(); if (!rv[key]) rv[key] = t.result; });
+    setReviews(rv);
+    const p = await supabase.from('preview_tasks').select('task_id,status,revision,preview_url');
+    if (!p.error) {
+      const map = {};
+      p.data.forEach(function(x){ map[x.task_id] = x; });
+      setPreviews(map);
+    }
+  }
+  React.useEffect(function(){
+    load(); // initial load always runs; only the polls are visibility-gated
+    const iv = setInterval(function(){ if (document.visibilityState === 'visible') load(); }, 5000);
+    return function(){ clearInterval(iv); };
+  }, []);
+  async function cancel(id) {
+    // Guarded: can never clobber a terminal status that landed after render
+    await supabase.from('worker_tasks').update({status:'cancelled'}).eq('id', id).in('status', ['queued','running']);
+    load();
+  }
+  return h('div', {id:'tasks'},
+    msg ? h('p', {className:'muted'}, msg) : null,
+    tasks.map(function(t){ return h(TaskCard, {key:t.id, t:t, onCancel:cancel, preview:previews[t.id], review:reviews[String(t.id)]}); }));
+}
+
+// ===== Goals tab =====
+// Goals render as boxes connected by a dot-and-line path (a simple roadmap), and each
+// box expands to a checklist of mini-objectives rather than a percent-complete meter.
+// Data layer note: no `goals` table, no migrations, no supabase.from() calls here.
+// Goals are persisted client-side to localStorage (key alleah_goals_v1) using the
+// same load-on-init / write-on-change pattern as the chat history (HISTORY_KEY /
+// alleah_chat_v1) above. The view starts EMPTY for every user - there are no demo
+// fixtures - and shows a friendly empty state until the user adds their first goal
+// via the inline "+ New goal" form. When a real goals table + RPCs are designed,
+// swap the localStorage load/save below for supabase.from('goals') calls following
+// the same RLS-policy pattern as folders/queries/worker_tasks.
+const DIFFICULTY = {
+  easy:   {label: 'Easy',   color: 'var(--accent)'},
+  medium: {label: 'Medium', color: 'var(--info)'},
+  hard:   {label: 'Hard',   color: 'var(--warning)'},
+  epic:   {label: 'Epic',   color: 'var(--purple)'},
+};
+const GOAL_STATUS_META = {
+  active:    {color:'var(--accent)',  icon:'▶'},
+  completed: {color:'var(--accent)',  icon:'✓'},
+  paused:    {color:'var(--warning)', icon:'⏸'},
+  abandoned: {color:'var(--neutral)', icon:'⦸'},
+};
+const GOALS_DAY = 86400000;
+
+function loadGoals() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GOALS_KEY));
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
+}
+
+// Real mini-objective generation via the goal-steps Edge Function (Haiku).
+// The rolled-back app had NO generation path, and the briefly-promoted
+// version faked it from a fixed local list (the "research neighborhoods"
+// bug). Steps come from the backend built for exactly this; failures
+// surface as a message, never as canned filler.
+async function generateObjectivesFor(goal) {
+  const s = await supabase.auth.getSession();
+  const token = s.data && s.data.session ? s.data.session.access_token : null;
+  if (!token) throw new Error('not signed in');
+  const res = await fetch(SB_URL + '/functions/v1/goal-steps', {
+    method: 'POST',
+    headers: {'content-type':'application/json', 'authorization':'Bearer ' + token},
+    body: JSON.stringify({title: goal.title, description: goal.description, difficulty: goal.difficulty}),
+  });
+  if (!res.ok) throw new Error('generation failed (' + res.status + ')');
+  const data = await res.json();
+  if (!Array.isArray(data.steps) || !data.steps.length) throw new Error('no steps returned');
+  return data.steps.map((t, i) => ({
+    id: 'o' + Date.now().toString(36) + i,
+    text: String(t).slice(0, 120),
+    done: false,
+  }));
+}
+
+
+// Fix (due-date bug): <input type="date"> hands back a plain "YYYY-MM-DD" string.
+// That string must be parsed into a real calendar date, not coerced through Number()/
+// parseInt() or otherwise treated as a raw epoch value - either of those reads only
+// the leading digits (e.g. "2025" from "2025-06-15") and produces a millisecond
+// timestamp of just a few seconds after the Unix epoch, i.e. a due date that stores
+// and displays as 20000+ days in the past. Parse the y/m/d components explicitly and
+// build a real local-midnight Date from them so the stored target_date always matches
+// what the user picked.
+function parseDateInputToMs(dateStr) {
+  if (!dateStr) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return null;
+  const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+  return new Date(year, month - 1, day).getTime();
+}
+
+function fmtRelDay(ms) {
+  const now = Date.now();
+  const days = Math.round((ms - now) / GOALS_DAY);
+  if (days === 0) return 'today';
+  if (days > 0) return 'in ' + days + 'd';
+  return Math.abs(days) + 'd ago';
+}
+function fmtAgeShort(ms) {
+  const days = Math.round((Date.now() - ms) / GOALS_DAY);
+  if (days < 1) return 'today';
+  if (days < 30) return days + 'd ago';
+  if (days < 365) return Math.round(days/30) + 'mo ago';
+  return Math.round(days/365) + 'y ago';
+}
+
+function GoalBox(props) {
+  const g = props.g;
+  const [open, setOpen] = React.useState(false);
+  const diff = DIFFICULTY[g.difficulty];
+  const meta = GOAL_STATUS_META[g.status] || {color:'var(--text-secondary)', icon:'•'};
+  const overdue = g.status === 'active' && g.target_date != null && g.target_date < Date.now();
+  const total = g.objectives.length;
+  const done = g.objectives.filter(o => o.done).length;
+  const ratio = total ? done / total : 0;
+  const meterColor = overdue ? 'var(--danger)' : meta.color;
+  let dateLine;
+  if (g.status === 'completed') dateLine = 'completed ' + fmtAgeShort(g.completed_at);
+  else if (g.status === 'active') dateLine = (overdue ? 'was due ' : 'due ') + fmtRelDay(g.target_date);
+  else dateLine = 'target ' + fmtRelDay(g.target_date);
+  return h('div', {className:'goal-box', onClick:()=>setOpen(!open)},
+    h('div', {className:'goal-box-head'},
+      h('p', {style:{fontSize:'15px',fontWeight:700,margin:'0 0 2px'}}, g.title),
+      h('span', {className:'pill', style:{background:'color-mix(in srgb, '+diff.color+' 16%, transparent)', color:diff.color, border:'1px solid color-mix(in srgb, '+diff.color+' 45%, transparent)'}}, diff.label)),
+    h('div', {style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}},
+      h(StatusBadge, {status:g.status, pulse:g.status==='active', label:g.status}),
+      h('span', {className:'small'}, g.category),
+      g.target_date != null ? h('span', {className:'small'}, '·') : null,
+      g.target_date != null ? h('span', {className:'small', style:{color: overdue ? 'var(--danger)' : 'var(--text-secondary)'}}, (overdue ? '⚠ ' : '') + dateLine) : null),
+    h('div', {className:'meter'}, h('div', {style:{width:(ratio*100)+'%', background:meterColor}})),
+    h('div', {className:'goal-obj-count'}, done + ' / ' + total + ' mini-objectives'),
+    open ? h('div', null,
+      h('div', {className:'goal-desc'}, g.description),
+      h('div', {className:'row', style:{margin:'6px 0'}},
+        h('button', {
+          type:'button', className:'secondary',
+          disabled: props.generating,
+          onClick:(e)=>{ e.stopPropagation(); props.onGenerate(g); },
+        }, props.generating ? 'Generating steps...'
+           : (g.objectives.length ? 'Regenerate steps' : 'Generate steps'))),
+      props.genErr ? h('p', {className:'small', style:{color:'var(--danger)'}}, '⚠ ' + props.genErr) : null,
+      h('div', {className:'goal-checklist'},
+        g.objectives.map(o => h('label', {
+            key:o.id, className:'goal-obj' + (o.done ? ' done' : ''),
+            onClick:(e)=>e.stopPropagation(),
+          },
+          h('input', {type:'checkbox', checked:o.done, onChange:()=>props.onToggle(g.id, o.id)}),
+          h('span', null, o.text))))) : null);
+}
+
+function NewGoalForm(props) {
+  const [title, setTitle] = React.useState('');
+  const [category, setCategory] = React.useState('');
+  const [difficulty, setDifficulty] = React.useState('medium');
+  const [targetDate, setTargetDate] = React.useState('');
+  const [description, setDescription] = React.useState('');
+
+  function submit(e) {
+    e.preventDefault();
+    const t = title.trim();
+    if (!t) return;
+    props.onAdd({
+      id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      title: t,
+      category: category.trim() || 'General',
+      difficulty,
+      status: 'active',
+      description: description.trim(),
+      created_at: Date.now(),
+      target_date: parseDateInputToMs(targetDate),
+      objectives: [],
+    });
+  }
+
+  return h('form', {className:'card addform', onSubmit:submit},
+    h('input', {placeholder:'Goal title', value:title,
+      autoFocus:true, onChange:e=>setTitle(e.target.value)}),
+    h('div', {className:'row2'},
+      h('input', {placeholder:'Category (optional)', value:category, onChange:e=>setCategory(e.target.value)}),
+      h('select', {value:difficulty, onChange:e=>setDifficulty(e.target.value)},
+        Object.keys(DIFFICULTY).map(k => h('option', {key:k, value:k}, DIFFICULTY[k].label)))),
+    h('input', {type:'date', value:targetDate, onChange:e=>setTargetDate(e.target.value)}),
+    h('textarea', {placeholder:'Description (optional)', value:description, rows:3, style:{minHeight:'70px'}, onChange:e=>setDescription(e.target.value)}),
+    h('div', {className:'row'},
+      h('button', {type:'submit'}, 'Add goal'),
+      h('button', {type:'button', className:'secondary', onClick:props.onCancel}, 'Cancel')));
+}
+
+function Goals(props) {
+  const [goals, setGoals] = React.useState(loadGoals);
+  const [showForm, setShowForm] = React.useState(false);
+
+  React.useEffect(() => {
+    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  }, [goals]);
+
+  function toggleObjective(goalId, objId) {
+    // localStorage-backed only: no supabase.update() here by design (see NOTE above).
+    setGoals(gs => gs.map(g => g.id !== goalId ? g : {
+      ...g, objectives: g.objectives.map(o => o.id !== objId ? o : {...o, done: !o.done}),
+    }));
+  }
+
+  const [generating, setGenerating] = React.useState({});
+  const [genErr, setGenErr] = React.useState({});
+
+  function applyObjectives(goalId, objectives) {
+    setGoals(gs => gs.map(g => g.id !== goalId ? g : {...g, objectives}));
+  }
+
+  function generateFor(g) {
+    setGenerating(m => ({...m, [g.id]: true}));
+    setGenErr(m => ({...m, [g.id]: ''}));
+    generateObjectivesFor(g)
+      .then(objs => applyObjectives(g.id, objs))
+      .catch(e => setGenErr(m => ({...m, [g.id]: String(e.message || e)})))
+      .finally(() => setGenerating(m => ({...m, [g.id]: false})));
+  }
+
+  function addGoal(g) {
+    setGoals(gs => [g, ...gs]);
+    setShowForm(false);
+    generateFor(g); // steps arrive async; goal is usable immediately
+  }
+
+  return h('div', {id:'goals'},
+    goals.length ? h('div', {className:'summary'},
+      h('span', null, h('b', null, goals.length), ' goals'),
+      h('span', null, h('b', null, goals.reduce((n,g)=>n+g.objectives.filter(o=>o.done).length,0)), ' objectives done')) : null,
+    showForm
+      ? h(NewGoalForm, {onAdd:addGoal, onCancel:()=>setShowForm(false)})
+      : h('button', {type:'button', className:'newgoalbtn', onClick:()=>setShowForm(true)}, '+ New goal'),
+    goals.length === 0 && !showForm
+      ? h('p', {className:'muted', style:{padding:'16px 2px'}}, 'No goals yet - add your first.')
+      : null,
+    goals.length ? h('div', {className:'goal-path', style:{marginTop:'10px'}},
+      goals.map((g, i) => h('div', {className:'goal-row', key:g.id},
+        h('div', {className:'goal-connector'},
+          h('span', {className:'goal-node-dot', style:{color: (GOAL_STATUS_META[g.status]||{}).color}}),
+          i < goals.length - 1 ? h('span', {className:'goal-node-line'}) : null),
+        h(GoalBox, {g, onToggle: toggleObjective, onGenerate: generateFor, generating: !!generating[g.id], genErr: genErr[g.id] || ''})))) : null);
+}
+
+function UpgradeCard(props) {
+  const p = props.p;
+  const benefit = BENEFIT_TYPES[p.benefit_type] || {label: p.benefit_type, color: 'var(--text-secondary)'};
+  const status = PROPOSAL_STATUS[p.status] || {label: p.status, color: 'var(--text-secondary)', icon:'•'};
+  return h('div', {className:'card'},
+    h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'8px'}},
+      h('span', {className:'chip', style:{background:'color-mix(in srgb, '+benefit.color+' 16%, transparent)', color:benefit.color, borderColor:'color-mix(in srgb, '+benefit.color+' 45%, transparent)'}}, benefit.label),
+      h(StatusBadge, {status:p.status, label:status.label})),
+    h('p', {style:{fontSize:'15px',fontWeight:700,margin:'10px 0 2px'}}, p.title),
+    h('p', {className:'small', style:{fontSize:'13.5px',color:'var(--text-secondary)',margin:'2px 0 0'}}, p.summary),
+    h('div', {className:'score-row'},
+      h('div', {className:'score-col'},
+        h('div', {className:'score-label'}, h('span', null, 'Functionality'), h('span', null, p.functionality_score + '/10')),
+        h('div', {className:'meter'}, h('div', {style:{width:(p.functionality_score*10)+'%', background:'var(--accent)'}}))),
+      h('div', {className:'score-col'},
+        h('div', {className:'score-label'}, h('span', null, 'Cost'), h('span', null, p.cost_score + '/10')),
+        h('div', {className:'meter'}, h('div', {style:{width:(p.cost_score*10)+'%', background:'var(--warning)'}})))),
+    h('div', {className:'priority-num'}, 'Priority score: ', h('b', null, (p.functionality_score - p.cost_score))),
+    p.status === 'proposed' ? h('div', {className:'upgrade-actions'},
+      h('button', {type:'button', onClick:()=>props.onDecide(p.id, 'approved')}, 'Approve'),
+      h('button', {type:'button', className:'reject-btn', onClick:()=>props.onDecide(p.id, 'rejected')}, 'Reject'))
+    : (p.status === 'approved' || p.status === 'building') ? h('div', {className:'upgrade-actions'},
+      h('button', {type:'button', onClick:()=>props.onDecide(p.id, 'done')}, 'Mark done'))
+    : null);
+}
+
+const PROPOSAL_STATUS = {
+  proposed: {label: 'Proposed', color: 'var(--text-secondary)', icon:'◌'},
+  approved: {label: 'Approved', color: 'var(--info)',            icon:'➜'},
+  building: {label: 'Building', color: 'var(--warning)',         icon:'⚙'},
+  done:     {label: 'Done',     color: 'var(--accent)',          icon:'✓'},
+  rejected: {label: 'Rejected', color: 'var(--danger)',          icon:'✕'},
+};
+Object.keys(PROPOSAL_STATUS).forEach(k => { STATUS_META[k] = {color: PROPOSAL_STATUS[k].color, icon: PROPOSAL_STATUS[k].icon}; });
+Object.keys(GOAL_STATUS_META).forEach(k => { STATUS_META[k] = STATUS_META[k] || GOAL_STATUS_META[k]; });
+
+const OPEN_STATUSES = ['proposed', 'approved', 'building'];
+const STATUS_FILTERS = ['open', 'done', 'rejected', 'all'];
+const FILTER_LABELS = {open: 'Open', done: 'Completed', rejected: 'Rejected', all: 'All'};
+
+const BENEFIT_TYPES = {
+  ui_improvement:    {label: 'UI improvement',    color: 'var(--info)'},
+  efficiency_upgrade:{label: 'Efficiency upgrade',color: 'var(--accent)'},
+  feature_update:    {label: 'Feature update',    color: 'var(--purple)'},
+  new_feature:       {label: 'New feature',       color: 'var(--warning)'},
+  bug_fix:           {label: 'Bug fix',           color: 'var(--danger)'},
+};
+
+function ResearchDirectiveForm(props) {
+  const [text, setText] = React.useState('');
+  const [priority, setPriority] = React.useState('3');
+  const [busy, setBusy] = React.useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    await props.onSubmit(t, Number(priority));
+    setBusy(false);
+    setText(''); setPriority('3');
+  }
+
+  return h('form', {className:'card addform', onSubmit:submit},
+    h('p', {style:{fontSize:'14px',fontWeight:700,margin:'0 0 2px'}}, 'Queue a research question'),
+    h('textarea', {
+      placeholder:'What should Alleah look into?', value:text, rows:3,
+      style:{minHeight:'70px'}, onChange:e=>setText(e.target.value),
+    }),
+    h('div', {className:'row2'},
+      h('select', {value:priority, onChange:e=>setPriority(e.target.value)},
+        [1,2,3,4,5].map(n => h('option', {key:n, value:n}, 'Priority ' + n + (n===1?' (low)':n===5?' (high)':'')))),
+      h('button', {type:'submit', disabled:busy || !text.trim()}, busy ? 'Queuing...' : 'Queue question')));
+}
+
+function Upgrades(props) {
+  const [proposals, setProposals] = React.useState([]);
+  const [filter, setFilter] = React.useState('open');
+  const [msg, setMsg] = React.useState('loading...');
+  const [directiveMsg, setDirectiveMsg] = React.useState('');
+
+  async function load() {
+    const r = await supabase.from('optimization_proposals').select('*').order('priority', {ascending:false});
+    if (r.error) { setMsg('Error: ' + r.error.message); return; }
+    setProposals(r.data);
+    setMsg(r.data.length ? '' : 'No proposals yet. Alleah will file these as she finds them.');
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function decide(id, status) {
+    const prev = proposals;
+    setProposals(ps => ps.map(p => p.id === id ? {...p, status} : p)); // optimistic
+    const r = await supabase.from('optimization_proposals').update({status}).eq('id', id);
+    if (r.error) { setProposals(prev); setMsg('Error: ' + r.error.message); }
+  }
+
+  async function queueDirective(directive_text, priority) {
+    const r = await supabase.from('research_directives').insert({directive_text, priority});
+    setDirectiveMsg(r.error ? 'Error: ' + r.error.message : 'Question queued.');
+    setTimeout(() => setDirectiveMsg(''), 3000);
+  }
+
+  const visible = filter === 'all' ? proposals
+    : filter === 'open' ? proposals.filter(p => OPEN_STATUSES.includes(p.status))
+    : proposals.filter(p => p.status === filter);
+  const counts = STATUS_FILTERS.reduce((acc, f) => {
+    acc[f] = f === 'all' ? proposals.length
+      : f === 'open' ? proposals.filter(p => OPEN_STATUSES.includes(p.status)).length
+      : proposals.filter(p => p.status === f).length;
+    return acc;
+  }, {});
+
+  return h('div', {id:'upgrades'},
+    h('div', {className:'filterbar'},
+      STATUS_FILTERS.map(f => h('button', {
+        key:f, type:'button', className:'filterbtn' + (filter === f ? ' active' : ''),
+        onClick:() => setFilter(f),
+      }, FILTER_LABELS[f] + ' (' + counts[f] + ')'))),
+    proposals.length ? h('div', {className:'summary'},
+      h('span', null, h('b', null, proposals.length), ' total'),
+      STATUS_FILTERS.filter(f => f !== 'all').map(f => h('span', {key:f},
+        h('b', null, counts[f]), ' ' + FILTER_LABELS[f].toLowerCase()))) : null,
+    msg ? h('p', {className:'muted'}, msg) : null,
+    visible.map(p => h(UpgradeCard, {key:p.id, p, onDecide:decide})),
+    visible.length === 0 && proposals.length > 0 ? h('p', {className:'muted', style:{padding:'8px 2px'}}, 'No proposals match this filter.') : null,
+    h(ResearchDirectiveForm, {onSubmit:queueDirective}),
+    directiveMsg ? h('p', {className:'small', style:{color:'var(--accent)'}}, '✓ ' + directiveMsg) : null);
+}
+
+function App() {
+  const [session, setSession] = React.useState(undefined);
+  React.useEffect(() => {
+    supabase.auth.getSession().then(r => setSession(r.data.session));
+    const sub = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.data.subscription.unsubscribe();
+  }, []);
+  if (session === undefined) return h('p', {className:'muted', style:{padding:'16px'}}, 'Loading...');
+  return session ? h(Chat, {session}) : h(Auth);
+}
+createRoot(document.getElementById('root')).render(h(App));
+</script></body></html>
+

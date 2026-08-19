@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alleah — domain-scoped research (preview)</title>
+<meta name="theme-color" content="#121212">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#121212;
+  --surface:#1c1c1e;
+  --surface-2:#242427;
+  --border:#3a3a3d;
+  --text-primary:#f2f2f3;
+  --text-secondary:#b7bac0;
+  --accent:#3ddb96;
+  --accent-contrast:#06120c;
+  --danger:#ff9086;
+  --focus-ring:#7db8ff;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:16px/1.5 -apple-system,system-ui,sans-serif}
+#root{height:100dvh;max-width:680px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+header{display:flex;flex-direction:column;gap:2px;padding:12px 14px 8px;flex:none;border-bottom:1px solid var(--border)}
+header h1{font-size:18px;margin:0}
+header .subtitle{font-size:12.5px;color:var(--text-secondary)}
+.preview-flag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);border-radius:999px;padding:2px 10px;width:fit-content;margin-top:4px}
+#thread{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:10px;min-height:0;-webkit-overflow-scrolling:touch}
+.msg-row{display:flex;flex-direction:column;gap:6px;max-width:100%}
+.msg-row.user{align-self:flex-end;align-items:flex-end}
+.msg-row.assistant{align-self:flex-start;align-items:flex-start;width:100%}
+.msg-row-meta{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--text-secondary);padding:0 2px}
+.msg-row-name{font-weight:700;color:var(--text-primary)}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;font-size:15px}
+.msg.user{background:var(--accent);color:var(--accent-contrast);border-bottom-right-radius:4px}
+.msg.assistant{background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-bottom-left-radius:4px;max-width:100%}
+.cites{align-self:flex-start;font-size:12px;color:var(--text-secondary);padding:0 6px}
+.muted{color:var(--text-secondary);font-size:14px;padding:0 6px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.small{font-size:12px;color:var(--text-secondary);margin:2px 0}
+.task-full{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;max-height:340px;overflow-y:auto;font-size:13.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+button{background:var(--accent);color:var(--accent-contrast);border:0;border-radius:14px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer;min-height:44px}
+button.secondary{background:var(--surface-2);color:var(--text-primary);font-size:13px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);min-height:40px;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.scope-card{margin:2px 0}
+.scope-btns{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.scope-btns button{width:100%;text-align:left;white-space:normal;line-height:1.3}
+.scope-btns button.chosen{outline:2px solid var(--accent);outline-offset:-2px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary)}
+.composer-wrap{flex:none;border-top:1px solid var(--border);padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+.quickchips{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px}
+.quickchip{flex:none;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;min-height:0}
+.url-hint{font-size:12px;color:var(--accent);padding:0 2px 6px;display:flex;align-items:center;gap:6px}
+.composer{display:flex;gap:8px;align-items:flex-end}
+textarea{flex:1;background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;padding:11px 14px;font:inherit;font-size:15px;resize:none;min-height:46px;max-height:140px;overflow-y:auto;line-height:1.4}
+textarea:disabled{opacity:.6}
+</style></head>
+<body>
+<div id="root">
+  <header>
+    <h1>Alleah</h1>
+    <span class="subtitle">Chat — research request, domain scoping</span>
+    <span class="preview-flag">● STATIC PREVIEW — fixture data, nothing sent anywhere</span>
+  </header>
+  <div id="thread"></div>
+  <div class="composer-wrap">
+    <div class="quickchips" id="quickchips"></div>
+    <div class="url-hint" id="urlHint" hidden></div>
+    <div class="composer">
+      <textarea id="ta" rows="1" placeholder="Message Alleah..."></textarea>
+      <button id="sendBtn" disabled>Send</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Fixture-only demo data. No network calls anywhere in this file: URLs
+  // below are synthetic example domains, never fetched, used only so the
+  // scoping-prompt / instruction-generation flow has something concrete
+  // to react to.
+  // ---------------------------------------------------------------------
+  var EXAMPLES = [
+    {label: 'acmewidgets.io (pricing)', text: 'Can you research https://acmewidgets.io/pricing and pull together what they charge and how their plans are structured?'},
+    {label: 'northbridgeconsulting.com', text: 'Start a research task on https://northbridgeconsulting.com/about — who runs it and what services they offer.'},
+    {label: 'getflowly.app', text: 'Research getflowly.app (https://getflowly.app) — what the product does and any recent news about it.'},
+  ];
+
+  function detectUrl(text) {
+    var m = String(text || '').match(/https?:\/\/[^\s]+/i);
+    if (!m) return null;
+    return m[0].replace(/[),.;:!?\]"']+$/, '');
+  }
+  function getDomain(url) {
+    try {
+      var u = new URL(url);
+      return u.hostname.replace(/^www\./i, '').toLowerCase();
+    } catch (e) { return null; }
+  }
+  // No live lookup (this is a static preview, and even in the real app
+  // there's no subdomain database) - offer common host prefixes as a
+  // starting scope; the instruction tells the worker to add any further
+  // <domain> subdomains it discovers along the way.
+  function guessSubdomains(domain, limit) {
+    var common = ['www','blog','docs','help','support','app','status','shop','careers'];
+    return common.slice(0, limit || 5).map(function(s){ return s + '.' + domain; });
+  }
+  function buildInstruction(mode, domain, rawAsk) {
+    var subs = guessSubdomains(domain, 5);
+    var subsSiteList = subs.map(function(s){ return 'site:' + s; }).join(', ');
+    var title = mode === 'follow'
+      ? 'Domain-scoped research \u2014 site + its own outbound links'
+      : 'Domain-scoped research \u2014 single site only';
+    var lines = [];
+    lines.push('Restrict every search query to `site:' + domain + '` (plus its subdomains: ' + subsSiteList +
+      ', and any further ' + domain + ' subdomains you discover while working). Never search on the bare ' +
+      'company/entity name alone \u2014 that pulls in unrelated namesakes and off-domain noise that are out of scope here.');
+    if (mode === 'follow') {
+      lines.push('Outbound links found ON ' + domain + '\u2019s own pages (a press mention it links to, a partner site, ' +
+        'its official social profiles, etc.) may be opened for corroborating context. Only follow links actually ' +
+        'discovered on a ' + domain + ' page \u2014 never run a separate open-web search on the company name to go ' +
+        'find those yourself.');
+    } else {
+      lines.push('Stay inside ' + domain + ' and its subdomains for the whole task. Do not follow outbound links to ' +
+        'other domains even if ' + domain + ' itself links to them.');
+    }
+    lines.push('Before searching, check `' + domain + '/sitemap.xml`. If it exists, treat it as the primary page ' +
+      'inventory: fetch it, enumerate the URLs it lists, and use that list to decide what to open \u2014 rather than ' +
+      'leaning on free-text search to discover pages. If it does not exist (404 or blocked), fall back to ' +
+      '`site:' + domain + '` search plus normal in-site navigation from the homepage.');
+    lines.push('Deliverable: ' + rawAsk);
+    return title + '\n\n' + lines.map(function(l){ return '- ' + l; }).join('\n');
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function fmtTime(ts) {
+    try { return new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); } catch(e){ return ''; }
+  }
+
+  // ---------------------------------------------------------------------
+  // State + tiny render loop (no framework - full re-render of #thread on
+  // every change, event delegation for interactive message cards).
+  // ---------------------------------------------------------------------
+  var uidCounter = 1;
+  function uid() { return 'm' + (uidCounter++); }
+
+  var state = {
+    messages: [],
+    // in-flight scoping request tied to the message that's being held:
+    // {id, stage:'prompt'|'review', msgText, url, domain, mode, instruction}
+    pendingScope: null,
+  };
+
+  function addMessage(m) {
+    m.id = m.id || uid();
+    m.ts = m.ts || Date.now();
+    state.messages.push(m);
+  }
+
+  var threadEl = document.getElementById('thread');
+  var taEl = document.getElementById('ta');
+  var sendBtn = document.getElementById('sendBtn');
+  var urlHintEl = document.getElementById('urlHint');
+  var quickchipsEl = document.getElementById('quickchips');
+
+  function render() {
+    var html = '';
+    if (state.messages.length === 0) {
+      html += '<p class="muted">Ask me to research something \u2014 paste a link and I\u2019ll ask how to scope it, ' +
+        'before a research task instruction ever gets composed. Try one of the example chips below.</p>';
+    }
+    state.messages.forEach(function(m){
+      if (m.kind === 'text') {
+        html += '<div class="msg-row ' + m.role + '">' +
+          '<div class="msg-row-meta"><span class="msg-row-name">' + (m.role === 'user' ? 'You' : 'Alleah') + '</span>' +
+          '<span>' + fmtTime(m.ts) + '</span></div>' +
+          '<div class="msg ' + m.role + '">' + escapeHtml(m.content) + '</div></div>';
+        if (m.domainScope) {
+          html += '<div class="cites">🔎 scoped to ' + escapeHtml(m.domainScope.domain) +
+            (m.domainScope.mode === 'follow' ? ' + its own outbound links' : ' only') + '</div>';
+        }
+      } else if (m.kind === 'scope-prompt') {
+        html += '<div class="msg-row assistant">' +
+          '<div class="msg-row-meta"><span class="msg-row-name">Alleah</span><span>' + fmtTime(m.ts) + '</span></div>' +
+          '<div class="msg assistant card scope-card">' +
+          '<p class="small" style="margin:0 0 2px;color:var(--text-primary)">🔗 <b>' + escapeHtml(m.domain) + '</b> was found in that message.</p>' +
+          '<p class="small" style="margin:0">Scope the research before it\u2019s sent \u2014 how should I handle it?</p>' +
+          '<div class="scope-btns">' +
+            '<button type="button" class="secondary' + (m.mode === 'strict' ? ' chosen' : '') + '" ' +
+              (m.resolved ? 'disabled' : '') + ' data-action="scope" data-mode="strict" data-id="' + m.id + '">Just this domain (and its subdomains)</button>' +
+            '<button type="button" class="secondary' + (m.mode === 'follow' ? ' chosen' : '') + '" ' +
+              (m.resolved ? 'disabled' : '') + ' data-action="scope" data-mode="follow" data-id="' + m.id + '">Also follow links it references out to other sites.</button>' +
+          '</div>' +
+          (m.resolved
+            ? '<p class="small" style="margin-top:8px">Chose: <span class="chip">' + (m.mode === 'follow' ? 'domain + its own outbound links' : 'this domain only') +
+              '</span> &nbsp;<button type="button" class="secondary" style="padding:2px 10px;min-height:0" data-action="rescope" data-id="' + m.id + '">change</button></p>'
+            : '') +
+          '</div></div>';
+      } else if (m.kind === 'scope-review') {
+        html += '<div class="msg-row assistant">' +
+          '<div class="msg-row-meta"><span class="msg-row-name">Alleah</span><span>' + fmtTime(m.ts) + '</span></div>' +
+          '<div class="msg assistant">Here\u2019s what I\u2019ll queue, scoped to <b>' + escapeHtml(m.domain) + '</b>:' +
+          '<pre class="task-full">' + escapeHtml(m.instruction) + '</pre>' +
+          '<div class="row" style="margin-top:10px">' +
+            '<button type="button" data-action="confirm" data-id="' + m.id + '">Use this — queue it</button>' +
+            '<button type="button" class="secondary" data-action="rescope" data-id="' + m.parentId + '">Change scope</button>' +
+          '</div></div></div>';
+      } else if (m.kind === 'confirm') {
+        html += '<div class="msg-row assistant">' +
+          '<div class="msg-row-meta"><span class="msg-row-name">Alleah</span><span>' + fmtTime(m.ts) + '</span></div>' +
+          '<div class="msg assistant">' + escapeHtml(m.content) + '</div></div>';
+      }
+    });
+    threadEl.innerHTML = html;
+    threadEl.scrollTop = threadEl.scrollHeight;
+
+    sendBtn.disabled = !taEl.value.trim();
+    var url = detectUrl(taEl.value);
+    if (url && getDomain(url)) {
+      urlHintEl.hidden = false;
+      urlHintEl.textContent = '🔗 link detected (' + getDomain(url) + ') — I\u2019ll ask how to scope it when you send.';
+    } else {
+      urlHintEl.hidden = true;
+    }
+  }
+
+  function findMessage(id) {
+    for (var i = 0; i < state.messages.length; i++) if (state.messages[i].id === id) return state.messages[i];
+    return null;
+  }
+
+  function genericReply(content) {
+    var lower = content.toLowerCase();
+    if (/\bresearch\b|\bstart a task\b|\bqueue\b/.test(lower)) {
+      return 'Got it — since that didn\u2019t include a link, I\u2019d research it broadly rather than scoping to one domain. (This preview only demonstrates the domain-scoped path — paste a URL to see it.)';
+    }
+    return 'Noted.';
+  }
+
+  function handleSend() {
+    var content = taEl.value.trim();
+    if (!content) return;
+    var url = detectUrl(content);
+    var domain = url ? getDomain(url) : null;
+    taEl.value = '';
+    if (domain) {
+      addMessage({role:'user', kind:'text', content: content});
+      addMessage({role:'assistant', kind:'scope-prompt', rawAsk: content, url: url, domain: domain, resolved:false});
+    } else {
+      addMessage({role:'user', kind:'text', content: content});
+      addMessage({role:'assistant', kind:'text', content: genericReply(content)});
+    }
+    autoGrow();
+    render();
+  }
+
+  function handleChoose(id, mode) {
+    var m = findMessage(id);
+    if (!m || m.resolved) return;
+    m.resolved = true;
+    m.mode = mode;
+    var instruction = buildInstruction(mode, m.domain, m.rawAsk);
+    addMessage({role:'assistant', kind:'scope-review', parentId: m.id, domain: m.domain, mode: mode, instruction: instruction});
+    render();
+  }
+
+  function handleRescope(id) {
+    var m = findMessage(id);
+    if (!m) return;
+    m.resolved = false;
+    delete m.mode;
+    // Drop any review/confirm messages that came from the previous choice.
+    state.messages = state.messages.filter(function(x){
+      return !(x.kind === 'scope-review' && x.parentId === id) && !(x.kind === 'confirm' && x.confirmFor === id);
+    });
+    render();
+  }
+
+  function handleConfirm(reviewId) {
+    var review = findMessage(reviewId);
+    if (!review) return;
+    var promptMsg = findMessage(review.parentId);
+    if (promptMsg) {
+      // tag the original user bubble with the resolved scope for the chip
+      for (var i = 0; i < state.messages.length; i++) {
+        var m = state.messages[i];
+        if (m.kind === 'text' && m.role === 'user' && !m.domainScope) {
+          // the nearest preceding user text message that started this flow
+          var idx = state.messages.indexOf(promptMsg);
+          if (i < idx && (idx - i) <= 2) {
+            m.domainScope = {domain: review.domain, mode: review.mode};
+          }
+        }
+      }
+    }
+    addMessage({
+      role:'assistant', kind:'confirm', confirmFor: review.parentId,
+      content: 'Queued ✅ (preview only — no task was actually created). Worker would pick this up within a minute and message here when it\u2019s done.',
+    });
+    render();
+  }
+
+  threadEl.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    var id = btn.getAttribute('data-id');
+    if (action === 'scope') handleChoose(id, btn.getAttribute('data-mode'));
+    else if (action === 'rescope') handleRescope(id);
+    else if (action === 'confirm') handleConfirm(id);
+  });
+
+  function autoGrow() {
+    taEl.style.height = 'auto';
+    taEl.style.height = Math.min(taEl.scrollHeight, 140) + 'px';
+  }
+  taEl.addEventListener('input', function(){ autoGrow(); render(); });
+  taEl.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  });
+  sendBtn.addEventListener('click', handleSend);
+
+  EXAMPLES.forEach(function(ex){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'quickchip';
+    b.textContent = ex.label;
+    b.addEventListener('click', function(){
+      taEl.value = ex.text;
+      autoGrow();
+      render();
+      taEl.focus();
+    });
+    quickchipsEl.appendChild(b);
+  });
+
+  render();
+})();
+</script>
+
+<!-- alleah-overlay-start -->
+<meta name="preview-rev" content="db7871c8-r0-1787170104">
+<style>/* Alleah preview pin overlay. Injected inline by the worker at bundle time.
+   All classes prefixed apo- to avoid colliding with app styles. */
+
+.apo-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
+.apo-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e05a33;
+  color: #fff;
+  font: 700 12px/22px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.apo-pin.apo-sent { background: #7a7a7a; }
+
+.apo-note {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  width: 210px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid #c9c2b6;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+}
+
+.apo-note textarea {
+  width: 100%;
+  height: 54px;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  font: 13px/1.35 system-ui, sans-serif;
+  padding: 4px;
+  box-sizing: border-box;
+  resize: none;
+}
+
+.apo-note-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.apo-btn {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: #efece5;
+  color: #333;
+}
+
+.apo-btn-primary { background: #e05a33; color: #fff; }
+
+.apo-send {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 13px/1 system-ui, sans-serif;
+  padding: 10px 16px;
+  background: #e05a33;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.apo-send:disabled { background: #a8a099; cursor: default; }
+
+.apo-review {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 1px solid #3d3a35;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 14px;
+  background: #fffdf8;
+  color: #3d3a35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.apo-review:disabled {
+  background: #efece5;
+  color: #8a8478;
+  border-color: #c9c2b6;
+  cursor: default;
+}
+
+.apo-log-toggle {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: auto;
+  z-index: 2147483001;
+  border: 0;
+  border-radius: 18px;
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 9px 13px;
+  background: #3d3a35;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.apo-log {
+  position: fixed;
+  left: 14px;
+  bottom: 54px;
+  width: 260px;
+  max-height: 45vh;
+  overflow-y: auto;
+  pointer-events: auto;
+  z-index: 2147483001;
+  background: #fffdf8;
+  border: 1px solid #c9c2b6;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  font: 12px/1.45 system-ui, sans-serif;
+  color: #333;
+}
+
+.apo-log h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8478;
+}
+
+.apo-log-item { border-top: 1px solid #eee7da; padding: 6px 0; }
+.apo-log-item:first-of-type { border-top: 0; }
+.apo-log-rev { color: #8a8478; font-size: 11px; }
+.apo-hidden { display: none; }
+</style>
+<script type="application/json" id="alleah-pin-config">{"task_id": "db7871c8-e62f-4c6a-b13d-7fa4174f7280", "revision": 0, "deploy_marker": "db7871c8-r0-1787170104", "endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/submit-pins", "review_endpoint": "https://sphnmcjlxxzgovisgepo.supabase.co/functions/v1/request-review", "changelog": []}</script>
+<script>/* Alleah preview pin overlay.
+   Injected INLINE into bundle HTML by the worker at bundle time, together with
+   a JSON config block in a script tag with id "alleah-pin-config" and type
+   application/json, carrying: task_id, revision, endpoint, changelog[].
+   NB: because this file is inlined into HTML, it must never contain the
+   literal closing script tag sequence — not even in comments — and the worker
+   must serialize the config JSON with "<" escaped as backslash-u003c for the same
+   reason (a note containing that sequence would truncate the script element).
+   Long-press (pointerdown held >500ms, <10px movement) drops a pin with an
+   inline note. Pins batch in localStorage; "Send Feedback" posts the batch to
+   the endpoint. All listeners are passive: taps, scrolls and swipes are never
+   intercepted. Anchoring is stable-selector + normalized offset, never raw
+   screen pixels. */
+(function () {
+  "use strict";
+
+  var cfgEl = document.getElementById("alleah-pin-config");
+  if (!cfgEl) return;
+  var cfg;
+  try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+
+  var LP_MS = 500;
+  var LP_SLOP_PX = 10;
+  var storeKey = "apo-pins-" + cfg.task_id + "-r" + cfg.revision;
+
+  function loadPins() {
+    try { return JSON.parse(localStorage.getItem(storeKey) || "[]"); }
+    catch (e) { return []; }
+  }
+  function savePins(pins) {
+    try { localStorage.setItem(storeKey, JSON.stringify(pins)); } catch (e) {}
+  }
+
+  /* ---------- stable selector: id > data-* > unique tag path ---------- */
+
+  function cssEscape(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function isUnique(sel) {
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  function selectorFor(el) {
+    if (el === document.body || el === document.documentElement) return "body";
+    if (el.id && isUnique("#" + cssEscape(el.id))) return "#" + cssEscape(el.id);
+    var i, a, sel;
+    for (i = 0; i < el.attributes.length; i++) {
+      a = el.attributes[i];
+      if (a.name.indexOf("data-") === 0 && a.value) {
+        sel = el.tagName.toLowerCase() + "[" + a.name + '="' + cssEscape(a.value) + '"]';
+        if (isUnique(sel)) return sel;
+      }
+    }
+    // Compose parent path with :nth-of-type until unique.
+    var path = [];
+    var node = el;
+    while (node && node !== document.body) {
+      var tag = node.tagName.toLowerCase();
+      var nth = 1;
+      var sib = node;
+      while ((sib = sib.previousElementSibling)) {
+        if (sib.tagName === node.tagName) nth++;
+      }
+      path.unshift(tag + ":nth-of-type(" + nth + ")");
+      sel = "body > " + path.join(" > ");
+      if (isUnique(sel)) return sel;
+      node = node.parentElement;
+    }
+    return "body > " + path.join(" > ");
+  }
+
+  /* ---------- overlay chrome ---------- */
+
+  var layer = document.createElement("div");
+  layer.className = "apo-layer";
+
+  var sendBtn = document.createElement("button");
+  sendBtn.className = "apo-send";
+  sendBtn.type = "button";
+
+  var logToggle = document.createElement("button");
+  logToggle.className = "apo-log-toggle";
+  logToggle.type = "button";
+  logToggle.textContent = "Changelog";
+
+  var reviewBtn = document.createElement("button");
+  reviewBtn.className = "apo-review";
+  reviewBtn.type = "button";
+  reviewBtn.textContent = "Request pre-ship review";
+
+  var logPanel = document.createElement("div");
+  logPanel.className = "apo-log apo-hidden";
+
+  function buildChangelog() {
+    var h = document.createElement("h3");
+    h.textContent = "Previous feedback";
+    logPanel.appendChild(h);
+    var items = cfg.changelog || [];
+    if (!items.length) {
+      var p = document.createElement("div");
+      p.className = "apo-log-item";
+      p.textContent = "No prior feedback.";
+      logPanel.appendChild(p);
+      return;
+    }
+    items.forEach(function (it) {
+      var d = document.createElement("div");
+      d.className = "apo-log-item";
+      var rev = document.createElement("div");
+      rev.className = "apo-log-rev";
+      rev.textContent = "rev " + it.revision + (it.resolution ? " — " + it.resolution : "");
+      var note = document.createElement("div");
+      note.textContent = it.note;
+      d.appendChild(note);
+      d.appendChild(rev);
+      logPanel.appendChild(d);
+    });
+  }
+
+  /* ---------- pins ---------- */
+
+  var pins = loadPins();          // [{selector, ox, oy, note, created_at, sent}]
+  var markers = [];               // DOM nodes parallel to pins
+
+  function updateSendBtn() {
+    var unsent = pins.filter(function (p) { return !p.sent; }).length;
+    sendBtn.textContent = unsent ? "Send Feedback (" + unsent + ")" : "Send Feedback";
+    sendBtn.disabled = !unsent;
+  }
+
+  function positionMarker(m, pin) {
+    var el = null;
+    try { el = document.querySelector(pin.selector); } catch (e) {}
+    if (!el) { m.style.display = "none"; return; }
+    var r = el.getBoundingClientRect();
+    m.style.display = "";
+    m.style.left = (r.left + r.width * pin.ox) + "px";
+    m.style.top = (r.top + r.height * pin.oy) + "px";
+  }
+
+  function repositionAll() {
+    for (var i = 0; i < pins.length; i++) positionMarker(markers[i], pins[i]);
+  }
+
+  // setTimeout, not requestAnimationFrame: rAF stalls in backgrounded or
+  // non-rendering tabs and would wedge the pending flag, leaving markers
+  // frozen. 70ms is imperceptible for marker tracking.
+  var repositionPending = false;
+  function scheduleReposition() {
+    if (repositionPending) return;
+    repositionPending = true;
+    setTimeout(function () { repositionPending = false; repositionAll(); }, 70);
+  }
+
+  function addMarker(pin) {
+    var m = document.createElement("div");
+    m.className = "apo-pin" + (pin.sent ? " apo-sent" : "");
+    m.textContent = String(pins.indexOf(pin) + 1);
+    layer.appendChild(m);
+    markers.push(m);
+    positionMarker(m, pin);
+  }
+
+  function openNote(pin, marker) {
+    var box = document.createElement("div");
+    box.className = "apo-note";
+    box.style.left = marker.style.left;
+    box.style.top = marker.style.top;
+    var ta = document.createElement("textarea");
+    ta.placeholder = "What should change here?";
+    ta.value = pin.note || "";
+    var row = document.createElement("div");
+    row.className = "apo-note-row";
+    var del = document.createElement("button");
+    del.className = "apo-btn";
+    del.type = "button";
+    del.textContent = "Remove";
+    var ok = document.createElement("button");
+    ok.className = "apo-btn apo-btn-primary";
+    ok.type = "button";
+    ok.textContent = "Save";
+    row.appendChild(del);
+    row.appendChild(ok);
+    box.appendChild(ta);
+    box.appendChild(row);
+    layer.appendChild(box);
+    ta.focus();
+
+    ok.addEventListener("click", function () {
+      pin.note = ta.value.trim();
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+    del.addEventListener("click", function () {
+      var idx = pins.indexOf(pin);
+      if (idx >= 0) {
+        pins.splice(idx, 1);
+        markers[idx].remove();
+        markers.splice(idx, 1);
+        markers.forEach(function (mm, i2) { mm.textContent = String(i2 + 1); });
+      }
+      savePins(pins);
+      updateSendBtn();
+      box.remove();
+    });
+  }
+
+  function dropPin(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || layer.contains(el) || el === sendBtn || el === logToggle || logPanel.contains(el)) return;
+    var r = el.getBoundingClientRect();
+    var pin = {
+      selector: selectorFor(el),
+      ox: r.width ? (clientX - r.left) / r.width : 0.5,
+      oy: r.height ? (clientY - r.top) / r.height : 0.5,
+      note: "",
+      route: location.pathname,
+      vp: window.innerWidth + "x" + window.innerHeight,
+      created_at: new Date().toISOString(),
+      sent: false
+    };
+    pins.push(pin);
+    savePins(pins);
+    addMarker(pin);
+    updateSendBtn();
+    openNote(pin, markers[markers.length - 1]);
+  }
+
+  /* ---------- long-press detection (all passive) ---------- */
+
+  var lp = null; // {x, y, timer}
+
+  function cancelLP() {
+    if (lp) { clearTimeout(lp.timer); lp = null; }
+  }
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (!ev.isPrimary) return;
+    if (layer.contains(ev.target) || ev.target === sendBtn || ev.target === logToggle ||
+        logPanel.contains(ev.target)) return;
+    var x = ev.clientX, y = ev.clientY;
+    cancelLP();
+    lp = {
+      x: x, y: y,
+      timer: setTimeout(function () { lp = null; dropPin(x, y); }, LP_MS)
+    };
+  }, { passive: true });
+
+  document.addEventListener("pointermove", function (ev) {
+    if (!lp || !ev.isPrimary) return;
+    if (Math.abs(ev.clientX - lp.x) > LP_SLOP_PX || Math.abs(ev.clientY - lp.y) > LP_SLOP_PX) cancelLP();
+  }, { passive: true });
+
+  document.addEventListener("pointerup", cancelLP, { passive: true });
+  document.addEventListener("pointercancel", cancelLP, { passive: true });
+  window.addEventListener("scroll", scheduleReposition, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleReposition, { passive: true });
+  // Catch-all: app re-renders move anchor elements without any scroll event
+  // (and backgrounded/non-rendering tabs deliver no scroll events at all).
+  // A slow interval keeps markers glued to their elements regardless.
+  setInterval(scheduleReposition, 500);
+
+  /* ---------- send ---------- */
+
+  sendBtn.addEventListener("click", function () {
+    var unsent = pins.filter(function (p) { return !p.sent && p.note; });
+    if (!unsent.length) {
+      // Pins without notes count as unsent but are not worth submitting alone.
+      unsent = pins.filter(function (p) { return !p.sent; });
+      if (!unsent.length) return;
+    }
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending…";
+    fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Payload shape is the submit-pins edge function's contract — do not
+        // add fields (revision is stamped server-side).
+        task_id: cfg.task_id,
+        pins: unsent.map(function (p) {
+          return {
+            element_selector: p.selector,
+            offset_x: p.ox,
+            offset_y: p.oy,
+            page_route: p.route || location.pathname,
+            note_text: p.note,
+            viewport_size: p.vp || (window.innerWidth + "x" + window.innerHeight)
+          };
+        })
+      })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      unsent.forEach(function (p) { p.sent = true; });
+      savePins(pins);
+      markers.forEach(function (m, i) {
+        if (pins[i].sent) m.classList.add("apo-sent");
+      });
+      updateSendBtn();
+    }).catch(function () {
+      sendBtn.textContent = "Send failed — retry";
+      sendBtn.disabled = false;
+    });
+  });
+
+  logToggle.addEventListener("click", function () {
+    logPanel.classList.toggle("apo-hidden");
+  });
+
+  /* ---------- request pre-ship review ---------- */
+
+  reviewBtn.addEventListener("click", function () {
+    if (!cfg.review_endpoint) return;
+    reviewBtn.disabled = true;
+    reviewBtn.textContent = "Requesting…";
+    fetch(cfg.review_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: cfg.task_id })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        return { ok: r.ok, data: data };
+      });
+    }).then(function (res) {
+      var accepted = res.ok && res.data.error === undefined &&
+                     res.data.accepted !== false && res.data.ok !== false;
+      if (accepted) {
+        reviewBtn.textContent = "Review queued";
+        // stays disabled — one request per page visit
+      } else {
+        var reason = res.data.reason || res.data.error ||
+                     "Not available right now";
+        reviewBtn.textContent = String(reason).slice(0, 60);
+        setTimeout(function () {
+          reviewBtn.textContent = "Request pre-ship review";
+          reviewBtn.disabled = false;
+        }, 4000);
+      }
+    }).catch(function () {
+      reviewBtn.textContent = "Network error — retry shortly";
+      setTimeout(function () {
+        reviewBtn.textContent = "Request pre-ship review";
+        reviewBtn.disabled = false;
+      }, 4000);
+    });
+  });
+
+  /* ---------- mount ---------- */
+
+  function mount() {
+    document.body.appendChild(layer);
+    document.body.appendChild(sendBtn);
+    if (cfg.review_endpoint) document.body.appendChild(reviewBtn);
+    document.body.appendChild(logToggle);
+    document.body.appendChild(logPanel);
+    buildChangelog();
+    pins.forEach(addMarker);
+    updateSendBtn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
+</script>
+<!-- alleah-overlay-end -->
+</body></html>
